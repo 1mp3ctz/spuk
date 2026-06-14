@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+build/
+dist/
+
+# uv
+uv.lock
+
+# Whisper model cache (downloaded on first run; can be GBs)
+models/
+.cache/
+
+# Secrets — never commit
+.env
+
+# macOS
+.DS_Store
