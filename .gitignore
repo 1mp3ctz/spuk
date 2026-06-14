@@ -18,3 +18,5 @@ models/
 
 # macOS
 .DS_Store
+# AppleDouble sidecar files created on exFAT/non-HFS volumes
+._*
