@@ -1,0 +1,30 @@
+# Spuk configuration — Phase 1 defaults.
+# Everything here is local and free. No network calls happen unless you
+# explicitly enable [post_process] AND set the money-warning flag.
+
+[transcribe]
+engine       = "faster-whisper"   # faster-whisper | mlx | whispercpp (only faster-whisper implemented in Phase 1)
+model        = "small"            # smallest multilingual model with good German; bump to "large-v3-turbo" if needed
+language     = "de"               # force German; skips language-detection latency and drift. Set "" to auto-detect.
+device       = "cpu"              # CTranslate2 has no Metal backend on Apple Silicon; CPU + int8 is the fast path
+compute_type = "int8"             # fast, small footprint; fine for the "small" model
+vad_filter   = true               # trim leading/trailing silence
+beam_size    = 1                  # greedy decoding = lowest latency. Raise to 5 for accuracy (Phase 2).
+
+[hotkey]
+# push_to_talk: hold the key to record, release to transcribe+paste (recommended default).
+# toggle: press once to start, press again to stop (Phase 2 option, riskier — easy to leave recording).
+mode = "push_to_talk"
+key  = "<ctrl>+<alt>+<space>"     # pynput HotKey syntax (special keys in <>). Avoid combos your apps already use.
+
+[audio]
+samplerate = 16000                # Whisper's native rate — capture here to avoid resampling
+channels   = 1
+min_seconds = 0.3                 # ignore taps shorter than this (accidental key bumps)
+
+[post_process]
+# OPTIONAL, PAID, OFF BY DEFAULT. The core dictation loop never needs this.
+enabled                  = false
+i_understand_this_costs_money = false   # second safety latch — both must be true to ever call the API
+provider                 = "claude"
+max_calls_per_day        = 50           # hard cap, fails closed
