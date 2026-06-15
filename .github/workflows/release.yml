@@ -53,13 +53,46 @@ jobs:
 
       - name: Zip the .app (ditto preserves symlinks + metadata)
         # plain `zip` corrupts a macOS .app bundle (Qt framework symlinks); use ditto.
+        # The zip is kept for the in-app self-updater (it downloads + unzips this).
         run: ditto -c -k --sequesterRsrc --keepParent dist/Spuk.app Spuk-macos.zip
+
+      - name: Build drag-to-Applications DMG
+        # A proper Mac installer: open the .dmg, drag Spuk onto Applications. Uses
+        # the Aurora background in packaging/. Falls back to a plain (background-less)
+        # DMG if create-dmg's Finder scripting hiccups on the runner, so the release
+        # always ships a working installer.
+        run: |
+          brew install create-dmg
+          mkdir -p dmg-src
+          ditto dist/Spuk.app dmg-src/Spuk.app
+          create-dmg \
+            --volname "Spuk" \
+            --background packaging/dmg-background.png \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 128 \
+            --icon "Spuk.app" 150 185 \
+            --hide-extension "Spuk.app" \
+            --app-drop-link 450 185 \
+            --no-internet-enable \
+            "Spuk-macos.dmg" \
+            "dmg-src" \
+          || {
+            echo "create-dmg failed — building a plain DMG with hdiutil"
+            rm -f Spuk-macos.dmg
+            ln -s /Applications dmg-src/Applications
+            hdiutil create -volname "Spuk" -srcfolder dmg-src -ov -format UDZO Spuk-macos.dmg
+          }
+          test -f Spuk-macos.dmg || { echo "No DMG produced"; exit 1; }
+          echo "Built DMG:"; du -sh Spuk-macos.dmg
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
           name: Spuk-macos
-          path: Spuk-macos.zip
+          path: |
+            Spuk-macos.zip
+            Spuk-macos.dmg
           if-no-files-found: error
 
   # ---------------------------------------------------------------------------
@@ -134,15 +167,15 @@ jobs:
           fail_on_unmatched_files: true
           generate_release_notes: true
           files: |
+            dist-macos/Spuk-macos.dmg
             dist-macos/Spuk-macos.zip
             dist-windows/Spuk-windows.zip
           body: |
             ## Spuk — download below 👻
 
-            Two downloads, pick one:
-
-            - **Mac:** `Spuk-macos.zip`
-            - **Windows:** `Spuk-windows.zip`
+            - **Mac:** `Spuk-macos.dmg` — open it and **drag Spuk into Applications**.
+              *(`Spuk-macos.zip` is also here for the in-app updater and power users.)*
+            - **Windows:** `Spuk-windows.zip` — extract and run `Spuk.exe`.
 
             See the [README install guide](https://github.com/1mp3ctz/spuk#%EF%B8%8F-download--install)
             for the simple, step-by-step setup.

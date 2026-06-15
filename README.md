@@ -37,12 +37,13 @@ the one for your computer below and follow the steps.
 
 ### 🍎 On a Mac
 
-#### 1. Download
+#### 1. Download & install
 
-- On the Releases page, click **`Spuk-macos.zip`** to download it.
-- It lands in your **Downloads** folder. Double-click the `.zip` — it unzips into
-  an app called **Spuk** (with a little ghost icon).
-- Drag **Spuk** into your **Applications** folder. *(Recommended, but not required.)*
+- On the Releases page, click **`Spuk-macos.dmg`** to download it.
+- Open the downloaded `.dmg`. A window appears with the **Spuk** ghost on the left
+  and your **Applications** folder on the right.
+- **Drag Spuk onto Applications** — just like installing any other Mac app. Then
+  eject the disk (the little ⏏ next to "Spuk" in Finder's sidebar).
 
 #### 2. Open it the first time (important — read this!)
 
