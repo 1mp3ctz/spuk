@@ -19,8 +19,8 @@ log = logging.getLogger("spuk.transcriber")
 
 
 class Transcriber(Protocol):
-    def transcribe(self, audio: np.ndarray, samplerate: int) -> str:
-        """Return the transcribed text for ``audio`` (mono float32 in [-1, 1])."""
+    def transcribe(self, audio: np.ndarray, samplerate: int, language: str) -> str:
+        """Return transcribed text for ``audio`` (mono float32 in [-1, 1]) in ``language``."""
         ...
 
 
@@ -48,14 +48,14 @@ class FasterWhisperTranscriber:
             compute_type=self._cfg.compute_type,
         )
 
-    def warm(self, samplerate: int) -> None:
+    def warm(self, samplerate: int, language: str) -> None:
         """Run one tiny inference so the first real utterance is fast."""
         self._ensure_loaded()
         silence = np.zeros(int(0.5 * samplerate), dtype=np.float32)
-        self.transcribe(silence, samplerate)
+        self.transcribe(silence, samplerate, language)
         log.info("Model warm — ready.")
 
-    def transcribe(self, audio: np.ndarray, samplerate: int) -> str:
+    def transcribe(self, audio: np.ndarray, samplerate: int, language: str) -> str:
         self._ensure_loaded()
         assert self._model is not None
 
@@ -65,10 +65,9 @@ class FasterWhisperTranscriber:
         if samplerate != 16000:
             raise ValueError(f"Expected 16kHz audio, got {samplerate}Hz")
 
-        language = self._cfg.language or None  # "" -> auto-detect
         segments, _info = self._model.transcribe(
             audio,
-            language=language,
+            language=language or None,  # "" -> auto-detect
             beam_size=self._cfg.beam_size,
             vad_filter=self._cfg.vad_filter,
         )

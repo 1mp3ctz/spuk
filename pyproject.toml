@@ -8,9 +8,14 @@ dependencies = [
     "faster-whisper>=1.1,<2",      # CTranslate2 Whisper; bundles PyAV so no ffmpeg binary needed
     "sounddevice>=0.5,<0.6",       # PortAudio mic capture -> raw float32 numpy
     "numpy>=1.26,<3",
-    "pynput>=1.7,<2",              # global hotkey + synthetic Cmd+V
-    "pyperclip>=1.9,<2",           # clipboard get/set (wraps pbcopy/pbpaste)
+    "pynput>=1.7,<2",              # global hotkey + synthetic paste (cross-platform)
+    "pyperclip>=1.9,<2",           # clipboard get/set
+    "pystray>=0.19,<0.20",         # cross-platform system-tray icon (macOS + Windows)
+    "pillow>=10,<12",              # generate the tray icon at runtime
 ]
+
+[project.scripts]
+spuk = "spuk.__main__:main"
 
 [build-system]
 requires = ["hatchling"]
