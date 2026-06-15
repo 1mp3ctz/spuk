@@ -143,7 +143,10 @@ class SpukCore:
             mode=self._cfg.hotkey.mode,
             on_start=self._on_start,
             on_stop=self._on_stop,
+            on_cancel=self._on_cancel,
             taps={self._cfg.hotkey.cycle_language: self.cycle_language},
+            handsfree=self._cfg.hotkey.handsfree,
+            double_tap_seconds=self._cfg.hotkey.double_tap_seconds,
         )
 
     def run_headless(self) -> None:
@@ -178,6 +181,16 @@ class SpukCore:
                 self.on_recording_change(True)
         except Exception:
             log.error("Recording failed to start — check microphone permission.")
+
+    def _on_cancel(self) -> None:
+        """Discard the in-progress recording without transcribing.
+
+        Used for the first of a double-tap: that tiny clip is a gesture, not
+        speech, so we drop it instead of running it through Whisper.
+        """
+        self._recorder.stop()
+        if self.on_recording_change:
+            self.on_recording_change(False)
 
     def _on_stop(self) -> None:
         audio = self._recorder.stop()
