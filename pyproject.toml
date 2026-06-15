@@ -1,6 +1,6 @@
 [project]
 name = "spuk"
-version = "0.3.2"
+version = "0.3.3"
 description = "Private, local, free press-to-talk dictation for macOS and Windows."
 readme = "README.md"
 license = "MIT"
