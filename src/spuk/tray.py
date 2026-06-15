@@ -56,8 +56,13 @@ def run_tray(config: Config, core: SpukCore) -> None:
         for code in core.languages
     ]
 
+    listener_box: dict = {}
+
     def on_quit(icon, item):
         log.info("Quitting Spuk.")
+        listener = listener_box.get("listener")
+        if listener is not None:
+            listener.stop()  # stop the background hotkey thread so the process exits
         icon.stop()
 
     menu = Menu(
@@ -75,7 +80,7 @@ def run_tray(config: Config, core: SpukCore) -> None:
 
     # Start the global hotkey listener on a background thread, then warm the
     # model, then block on the tray (main thread).
-    core.make_listener().start()
+    listener_box["listener"] = core.make_listener().start()
     log.info("Warming model… (first launch downloads it)")
     core.warm()
     log.info(
