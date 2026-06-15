@@ -26,7 +26,6 @@ from PySide6.QtCore import (
 from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
-    QComboBox,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -39,8 +38,15 @@ from PySide6.QtWidgets import (
 
 from .config import Config
 from .core import SpukCore
+from .languages import display_name
 
+# Native display names for the three first-class languages; anything else falls
+# back to the English language name from languages.display_name().
 LANGUAGE_NAMES = {"en": "English", "de": "Deutsch", "pl": "Polski"}
+
+
+def _lang_label(code: str) -> str:
+    return LANGUAGE_NAMES.get(code, display_name(code))
 
 COLLAPSED = (64, 22)
 EXPANDED = (300, 168)
@@ -53,16 +59,19 @@ class CoreSignals(QObject):
 
     recording = Signal(bool)
     language = Signal(str)
+    languages = Signal(tuple)  # the curated set changed (add/remove)
     transcript = Signal(str)
     ready = Signal()
 
 
 class SpukBar(QWidget):
-    def __init__(self, config: Config, core: SpukCore) -> None:
+    def __init__(self, config: Config, core: SpukCore, signals: "CoreSignals") -> None:
         super().__init__()
         self._cfg = config
         self._core = core
+        self._sig = signals
         self._expanded = False
+        self._open_window = None  # set by run_bar; clicking the pill opens the window
 
         self.setWindowFlags(
             Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
@@ -99,15 +108,21 @@ class SpukBar(QWidget):
         header = QHBoxLayout()
         header.setSpacing(6)
         self._dot = QLabel("●")
-        self._dot.setStyleSheet("color:#6b7280; font-size:11px;")
+        self._dot.setStyleSheet("color:rgba(255,255,255,0.7); font-size:11px;")
         self._lang_code = QLabel(self._core.language.upper())
         self._lang_code.setFont(QFont("", 11, QFont.Bold))
         self._status = QLabel("starting…")
-        self._status.setStyleSheet("color:#9ca3af; font-size:11px;")
+        self._status.setStyleSheet("color:rgba(255,255,255,0.85); font-size:11px;")
+        self._gear = QPushButton("⚙")
+        self._gear.setObjectName("gear")
+        self._gear.setToolTip("Settings")
+        self._gear.setCursor(Qt.PointingHandCursor)
+        self._gear.clicked.connect(self._open_settings)
         header.addWidget(self._dot)
         header.addWidget(self._lang_code)
         header.addStretch(1)
         header.addWidget(self._status)
+        header.addWidget(self._gear)
         card.addLayout(header)
 
         # --- expanded-only widgets ---
@@ -117,37 +132,25 @@ class SpukBar(QWidget):
         self._dictate.released.connect(self._dictate_released)
         card.addWidget(self._dictate)
 
-        lang_row = QHBoxLayout()
+        # Language quick-switch chips (rebuilt when the curated set changes).
+        self._lang_row = QHBoxLayout()
         self._lang_buttons: dict[str, QPushButton] = {}
-        for code in self._core.languages:
-            b = QPushButton(LANGUAGE_NAMES.get(code, code))
-            b.setProperty("class", "lang")
-            b.setCheckable(True)
-            b.setChecked(code == self._core.language)
-            b.clicked.connect(lambda _checked, c=code: self._core.set_language(c))
-            self._lang_buttons[code] = b
-            lang_row.addWidget(b)
-        card.addLayout(lang_row)
-
-        self._mic = QComboBox()
-        self._populate_mics()
-        self._mic.currentIndexChanged.connect(self._mic_changed)
-        card.addWidget(self._mic)
+        self._rebuild_langs()
+        card.addLayout(self._lang_row)
 
         mod = "⌃⌥" if _is_mac() else "Ctrl+Alt"
-        self._hint = QLabel(f"Hold {mod} to dictate · ⌃⇧L switches language")
-        self._hint.setStyleSheet("color:#9ca3af; font-size:11px;")
+        self._hint = QLabel(f"Hold {mod} to dictate · ⚙ for languages & settings")
+        self._hint.setStyleSheet("color:rgba(255,255,255,0.8); font-size:11px;")
         card.addWidget(self._hint)
 
-        # Status text only shows when expanded so the collapsed pill stays tiny.
-        self._expanded_widgets = [self._status, self._dictate, self._mic, self._hint]
+        # Status + gear only show when expanded so the collapsed pill stays tiny.
+        self._expanded_widgets = [self._status, self._gear, self._dictate, self._hint]
         for w in self._expanded_widgets:
             w.hide()
         for b in self._lang_buttons.values():
             b.hide()
 
-        # Delayed, popup-aware collapse so opening the mic dropdown doesn't
-        # collapse the bar out from under it.
+        # Delayed collapse so a brief cursor wobble doesn't snap the bar shut.
         self._collapse_timer = QTimer(self)
         self._collapse_timer.setSingleShot(True)
         self._collapse_timer.setInterval(280)
@@ -155,43 +158,62 @@ class SpukBar(QWidget):
 
     @staticmethod
     def _card_qss(radius: int) -> str:
+        # Same Aurora purple/glass scheme as the main window (ui_window.py).
         return (
-            f"#card {{ background-color: rgba(24,24,28,235); border-radius: {radius}px; }}"
-            "QLabel { color: #f4f4f5; }"
-            "QComboBox { color: #f4f4f5; background:#2a2a31; border:1px solid #3a3a42;"
-            " border-radius:8px; padding:3px 8px; }"
-            f"QPushButton#dictate {{ color:#fff; background:{ACCENT}; border:none;"
-            " border-radius:10px; padding:8px; font-weight:600; }"
-            "QPushButton#dictate:pressed { background:#7c3aed; }"
-            "QPushButton.lang { color:#cfcfd4; background:#2a2a31; border:1px solid #3a3a42;"
-            " border-radius:8px; padding:4px 10px; }"
-            "QPushButton.lang:checked { color:#fff; background:" + ACCENT + "; border:none; }"
+            f"#card {{ background: qlineargradient(x1:0, y1:0, x2:1, y2:1,"
+            f" stop:0 #8b5cf6, stop:0.5 #7c3aed, stop:1 #6d28d9);"
+            f" border-radius: {radius}px; border:1px solid rgba(255,255,255,0.25); }}"
+            "QLabel { color: #ffffff; }"
+            "QComboBox { color:#ffffff; background:rgba(255,255,255,0.12);"
+            " border:1px solid rgba(255,255,255,0.25); border-radius:9px; padding:3px 8px; }"
+            "QComboBox QAbstractItemView { background:#4c1d95; color:#ffffff;"
+            " selection-background-color:#7c3aed; }"
+            "QPushButton#dictate { color:#6d28d9; background:rgba(255,255,255,0.92);"
+            " border:none; border-radius:10px; padding:8px; font-weight:700; }"
+            "QPushButton#dictate:pressed { background:#ffffff; }"
+            "QPushButton.lang { color:rgba(255,255,255,0.85); background:rgba(255,255,255,0.12);"
+            " border:1px solid rgba(255,255,255,0.22); border-radius:9px; padding:4px 10px; }"
+            "QPushButton.lang:checked { color:#6d28d9; background:rgba(255,255,255,0.92); border:none; }"
+            "QPushButton#gear { color:#ffffff; background:rgba(255,255,255,0.14);"
+            " border:1px solid rgba(255,255,255,0.25); border-radius:8px; padding:1px 6px; font-size:13px; }"
+            "QPushButton#gear:hover { background:rgba(255,255,255,0.28); }"
         )
 
-    def _populate_mics(self) -> None:
-        self._mic.addItem("System default", None)
-        try:
-            import sounddevice as sd
+    def _rebuild_langs(self) -> None:
+        """(Re)build the language quick-switch chips from the curated set."""
+        for b in self._lang_buttons.values():
+            self._lang_row.removeWidget(b)
+            b.deleteLater()
+        self._lang_buttons = {}
+        for code in self._core.languages:
+            b = QPushButton(_lang_label(code))
+            b.setProperty("class", "lang")
+            b.setCheckable(True)
+            b.setChecked(code == self._core.language)
+            b.clicked.connect(lambda _checked, c=code: self._core.set_language(c))
+            self._lang_buttons[code] = b
+            self._lang_row.addWidget(b)
+        if not self._expanded:
+            for b in self._lang_buttons.values():
+                b.hide()
 
-            for idx, dev in enumerate(sd.query_devices()):
-                if dev.get("max_input_channels", 0) > 0:
-                    self._mic.addItem(dev["name"], idx)
-        except Exception:  # noqa: BLE001
-            pass
+    def _open_settings(self) -> None:
+        if self._open_window is not None:
+            self._open_window()
 
     # --- core wiring -----------------------------------------------------
 
     def _wire_core(self) -> None:
-        self._sig = CoreSignals()
+        # The shared CoreSignals bus is created and connected to the core in
+        # run_bar(); the bar just listens on it (so the window can listen too).
         self._sig.recording.connect(self._on_recording)
         self._sig.language.connect(self._on_language)
+        self._sig.languages.connect(lambda _codes: self._rebuild_langs())
         self._sig.ready.connect(lambda: self._status.setText("ready"))
-        self._core.on_recording_change = self._sig.recording.emit
-        self._core.on_language_change = self._sig.language.emit
 
     def _on_recording(self, active: bool) -> None:
         self._dot.setStyleSheet(
-            f"color:{'#ef4444' if active else '#22c55e'}; font-size:14px;"
+            f"color:{'#fca5a5' if active else '#86efac'}; font-size:14px;"
         )
         self._status.setText("recording…" if active else "ready")
 
@@ -204,15 +226,10 @@ class SpukBar(QWidget):
         # Transcribe+paste blocks ~1s — keep it off the UI thread.
         threading.Thread(target=self._core.finish_recording, daemon=True).start()
 
-    def _mic_changed(self, _index: int) -> None:
-        # A bad device selection must never crash the app.
-        try:
-            self._core.set_input_device(self._mic.currentData())
-        except Exception as exc:  # noqa: BLE001
-            self._status.setText("mic unavailable")
-            import logging
+    # --- open the settings window ---------------------------------------
 
-            logging.getLogger("spuk.ui").warning("Could not set microphone: %s", exc)
+    def set_open_window(self, fn) -> None:
+        self._open_window = fn
 
     # --- hover expand / collapse ----------------------------------------
 
@@ -253,8 +270,8 @@ class SpukBar(QWidget):
         super().leaveEvent(event)
 
     def _maybe_collapse(self) -> None:
-        # Don't collapse while the mic dropdown is open or the cursor is back on us.
-        if self._mic.view().isVisible() or self.underMouse():
+        # Don't collapse while the cursor is back on us.
+        if self.underMouse():
             self._collapse_timer.start()
             return
         if self._expanded:
@@ -290,12 +307,12 @@ def _menubar_icon() -> QIcon:
     return QIcon(pm)
 
 
-def _install_menubar(app, core: SpukCore, listener) -> "QSystemTrayIcon | None":
-    """Add a menu-bar (system-tray) icon whose menu can quit Spuk.
+def _install_menubar(app, on_open, on_quit) -> "QSystemTrayIcon | None":
+    """Add a menu-bar (system-tray) icon to open Settings or quit Spuk.
 
-    The floating bar has no window chrome and Spuk runs with no Dock icon, so this
-    is the user's only way to quit. Returns the icon (kept alive by `app`) or None
-    if the platform has no system tray.
+    The pill has no window chrome and Spuk runs with no Dock icon, so this is the
+    user's way to reach Settings and to quit. Returns the icon (kept alive by
+    `app`) or None if the platform has no system tray.
     """
     if not QSystemTrayIcon.isSystemTrayAvailable():
         return None
@@ -304,21 +321,21 @@ def _install_menubar(app, core: SpukCore, listener) -> "QSystemTrayIcon | None":
     header = menu.addAction("Spuk")
     header.setEnabled(False)
     menu.addSeparator()
+    open_action = menu.addAction("Settings…")
+    open_action.triggered.connect(lambda: on_open())
+    menu.addSeparator()
     quit_action = menu.addAction("Quit Spuk")
-
-    def _quit() -> None:
-        # Stop the background hotkey listener so the process actually exits.
-        try:
-            if listener is not None:
-                listener.stop()
-        finally:
-            app.quit()
-
-    quit_action.triggered.connect(_quit)
+    quit_action.triggered.connect(lambda: on_quit())
 
     tray = QSystemTrayIcon(_menubar_icon(), app)
     tray.setToolTip("Spuk")
     tray.setContextMenu(menu)
+    # Clicking/double-clicking the icon (Windows tray) also opens the window.
+    tray.activated.connect(
+        lambda reason: on_open()
+        if reason in (QSystemTrayIcon.Trigger, QSystemTrayIcon.DoubleClick)
+        else None
+    )
     tray.show()
     return tray
 
@@ -327,20 +344,46 @@ def run_bar(config: Config, core: SpukCore) -> None:
     app = QApplication.instance() or QApplication([])
     app.setQuitOnLastWindowClosed(False)
 
-    bar = SpukBar(config, core)
+    # One shared signal bus: the core fires these (from the hotkey thread) and
+    # both the floating bar and the main window listen on them.
+    signals = CoreSignals()
+    core.on_recording_change = signals.recording.emit
+    core.on_language_change = signals.language.emit
+    core.on_languages_change = signals.languages.emit
+    core.on_transcript = signals.transcript.emit
+
+    # The floating pill is the primary, always-on UI.
+    bar = SpukBar(config, core, signals)
     bar.show()
+
+    # The Settings window is created up front but stays hidden — it only appears
+    # when the user clicks the pill's ⚙ button (or the menu-bar 'Settings…').
+    from .ui_window import SpukWindow
+
+    window = SpukWindow(config, core, signals)
+    bar.set_open_window(window.present)
 
     # Start the global hotkey listener on a background thread.
     listener = core.make_listener().start()
 
-    # Menu-bar icon with a Quit item (the only way out of this chrome-less app).
-    # Held by the QApplication so it isn't garbage-collected.
-    app._spuk_tray = _install_menubar(app, core, listener)  # type: ignore[attr-defined]
+    def quit_app() -> None:
+        # Stop the background hotkey listener so the process actually exits.
+        try:
+            if listener is not None:
+                listener.stop()
+        finally:
+            app.quit()
 
-    # Warm the model off the UI thread so the bar appears immediately.
+    window.set_quit(quit_app)
+
+    # Menu-bar icon (Settings / Quit). Held by the QApplication so it isn't GC'd.
+    app._spuk_tray = _install_menubar(app, window.present, quit_app)  # type: ignore[attr-defined]
+    app._spuk_window = window  # type: ignore[attr-defined]  # keep a strong ref
+
+    # Warm the model off the UI thread so the UI appears immediately.
     def _warm() -> None:
         core.warm()
-        bar._sig.ready.emit()
+        signals.ready.emit()
 
     threading.Thread(target=_warm, daemon=True).start()
 

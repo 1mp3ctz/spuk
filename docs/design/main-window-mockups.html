@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spuk — Main Window Mockups</title>
+<style>
+  :root{
+    --accent:#8b5cf6; --accent-2:#7c3aed; --accent-soft:#ede9fe;
+    --ok:#22c55e; --rec:#ef4444;
+    --ink:#18181b; --muted:#71717a;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,system-ui,sans-serif;
+    background:#f1f1f4; color:var(--ink); padding:40px 24px 80px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .page-head{max-width:1180px;margin:0 auto 32px;text-align:center}
+  .page-head h1{font-size:26px;margin:0 0 8px;letter-spacing:-.02em}
+  .page-head p{margin:0;color:var(--muted);font-size:15px;line-height:1.5}
+  .page-head .ghost{font-size:30px;vertical-align:middle}
+
+  .grid{
+    max-width:1180px;margin:0 auto;
+    display:grid;grid-template-columns:repeat(2,1fr);gap:40px 36px;
+  }
+  @media(max-width:1000px){.grid{grid-template-columns:1fr}}
+
+  .mock{display:flex;flex-direction:column;gap:14px}
+  .mock .label{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .mock .num{
+    font-weight:700;font-size:13px;color:#fff;background:var(--accent);
+    width:24px;height:24px;border-radius:7px;display:inline-flex;
+    align-items:center;justify-content:center;flex:none;
+  }
+  .mock .name{font-weight:700;font-size:16px;letter-spacing:-.01em}
+  .mock .tag{font-size:13px;color:var(--muted)}
+
+  /* generic window chrome */
+  .win{
+    border-radius:14px;overflow:hidden;
+    box-shadow:0 20px 50px -18px rgba(24,24,40,.45),0 4px 12px rgba(0,0,0,.06);
+  }
+  .bar{height:38px;display:flex;align-items:center;gap:8px;padding:0 14px}
+  .dots{display:flex;gap:8px}
+  .dots i{width:12px;height:12px;border-radius:50%;display:block}
+  .dots .r{background:#ff5f57}.dots .y{background:#febc2e}.dots .g{background:#28c840}
+  .bar .title{font-size:12px;font-weight:600;opacity:.6;margin:0 auto;padding-right:46px}
+
+  .body{padding:22px}
+
+  /* small reusable ghost svg */
+  .gicon{display:inline-block;vertical-align:middle}
+
+  /* ---------- A — Friendly (light, cozy, parents-first) ---------- */
+  .A .win{background:#fff;border:1px solid #ececf1}
+  .A .bar{background:#faf9fd;border-bottom:1px solid #f0eef6}
+  .A .body{padding:26px 26px 22px;text-align:center}
+  .A .avatar{
+    width:84px;height:84px;border-radius:50%;margin:2px auto 14px;
+    background:linear-gradient(160deg,#a78bfa,#7c3aed);
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 0 0 6px var(--accent-soft);position:relative;
+  }
+  .A .avatar .ring{
+    position:absolute;right:4px;bottom:4px;width:20px;height:20px;border-radius:50%;
+    background:var(--ok);border:3px solid #fff;
+  }
+  .A h2{margin:0;font-size:21px;letter-spacing:-.02em}
+  .A .sub{margin:4px 0 20px;color:var(--muted);font-size:14px}
+  .A .hero{
+    background:linear-gradient(180deg,var(--accent),var(--accent-2));color:#fff;
+    border-radius:14px;padding:16px;font-size:16px;font-weight:600;
+    box-shadow:0 10px 22px -8px rgba(124,58,237,.6);
+  }
+  .A .hero small{display:block;font-weight:500;opacity:.85;font-size:12px;margin-top:3px}
+  .A .row{display:flex;gap:10px;margin-top:18px}
+  .A .langs{display:flex;gap:8px;justify-content:center;margin-top:18px;flex-wrap:wrap}
+  .A .lang{padding:9px 16px;border-radius:999px;border:1.5px solid #e6e3f0;font-size:14px;font-weight:600;color:#555}
+  .A .lang.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .A .mic{
+    margin-top:16px;width:100%;text-align:left;border:1.5px solid #e9e7f0;border-radius:10px;
+    padding:11px 14px;font-size:13.5px;color:#444;display:flex;justify-content:space-between;align-items:center;
+  }
+  .A .mic .car{color:#bbb}
+  .A .priv{margin-top:18px;font-size:12.5px;color:#16a34a;font-weight:600}
+  .A .priv .lk{opacity:.9}
+
+  /* ---------- B — Pro dashboard (dark, sidebar) ---------- */
+  .B .win{background:#0f0f13;border:1px solid #26262e}
+  .B .bar{background:#17171c;border-bottom:1px solid #232329}
+  .B .bar .title{color:#cfcfd6}
+  .B .layout{display:flex;min-height:330px}
+  .B .side{width:150px;flex:none;background:#131318;border-right:1px solid #232329;padding:16px 12px}
+  .B .brand{display:flex;align-items:center;gap:8px;color:#fff;font-weight:700;font-size:14px;margin:2px 4px 16px}
+  .B .nav a{display:flex;align-items:center;gap:9px;color:#9a9aa6;font-size:13px;
+    padding:8px 10px;border-radius:8px;text-decoration:none;margin-bottom:2px}
+  .B .nav a.on{background:rgba(139,92,246,.16);color:#fff}
+  .B .nav a .ic{width:14px;height:14px;border-radius:4px;background:currentColor;opacity:.7}
+  .B .main{flex:1;padding:20px 22px;color:#e6e6ec}
+  .B .stat{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:600}
+  .B .stat .d{width:9px;height:9px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 4px rgba(34,197,94,.18)}
+  .B .stat small{color:#85858f;font-weight:500;font-size:12px;margin-left:auto}
+  .B .key{margin:16px 0;background:#1b1b22;border:1px solid #2a2a33;border-radius:10px;padding:13px 15px;display:flex;align-items:center;gap:10px}
+  .B .kbd{font-size:12px;font-weight:700;background:#2c2c36;border:1px solid #3a3a46;border-radius:6px;padding:3px 8px;color:#fff}
+  .B .key span{color:#9a9aa6;font-size:13px}
+  .B .seg{display:flex;background:#1b1b22;border:1px solid #2a2a33;border-radius:9px;padding:3px;gap:2px;margin-bottom:8px}
+  .B .seg b{flex:1;text-align:center;font-size:12.5px;font-weight:600;color:#9a9aa6;padding:6px;border-radius:6px;cursor:default}
+  .B .seg b.on{background:var(--accent);color:#fff}
+  .B .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#6b6b76;margin:14px 0 7px}
+  .B .hist{font-size:12.5px}
+  .B .hist .it{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid #1f1f26;color:#c4c4cc}
+  .B .hist .it time{color:#65656f;flex:none}
+
+  /* ---------- C — Minimal (system-settings clean) ---------- */
+  .C .win{background:#fafafa;border:1px solid #e7e7ea}
+  .C .bar{background:#f3f3f5;border-bottom:1px solid #e7e7ea}
+  .C .body{padding:8px 0 6px}
+  .C .hd{display:flex;align-items:center;gap:12px;padding:16px 22px 14px}
+  .C .hd .g{width:42px;height:42px;border-radius:11px;background:var(--accent);display:flex;align-items:center;justify-content:center;flex:none}
+  .C .hd h2{margin:0;font-size:16px}
+  .C .hd p{margin:2px 0 0;font-size:12.5px;color:var(--muted)}
+  .C .hd .badge{margin-left:auto;font-size:12px;font-weight:600;color:#16a34a;background:#dcfce7;padding:4px 10px;border-radius:999px}
+  .C .rows{margin:6px 14px 10px;background:#fff;border:1px solid #ececef;border-radius:12px}
+  .C .rw{display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid #f1f1f3;font-size:14px}
+  .C .rw:last-child{border-bottom:none}
+  .C .rw .k{color:#3f3f46}
+  .C .rw .v{margin-left:auto;color:#71717a;font-size:13px;display:flex;align-items:center;gap:8px}
+  .C .pill{font-size:12px;font-weight:600;border:1px solid #e3e3e7;border-radius:7px;padding:4px 9px;color:#52525b}
+  .C .pill.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .C .chev{color:#c4c4cc}
+  .C .foot{display:flex;justify-content:space-between;align-items:center;padding:12px 22px 16px}
+  .C .foot .pr{font-size:12px;color:var(--muted)}
+  .C .quit{font-size:13px;font-weight:600;color:#52525b;border:1px solid #e3e3e7;background:#fff;border-radius:8px;padding:7px 14px}
+
+  /* ---------- D — Glass (translucent / liquid-glass) ---------- */
+  .D .win{border:none;background:transparent;box-shadow:none}
+  .D .scene{
+    background:radial-gradient(120% 120% at 20% 0%,#8b5cf6 0%,#6d28d9 45%,#3b0764 100%);
+    border-radius:16px;padding:30px 26px 26px;position:relative;overflow:hidden;
+  }
+  .D .scene::before{content:"";position:absolute;inset:0;
+    background:radial-gradient(60% 50% at 80% 110%,rgba(255,255,255,.18),transparent 60%);}
+  .D .card{
+    position:relative;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+    background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.28);
+    border-radius:18px;padding:22px;color:#fff;box-shadow:0 18px 40px -16px rgba(0,0,0,.5);
+  }
+  .D .top{display:flex;align-items:center;gap:13px;margin-bottom:18px}
+  .D .top .g{width:48px;height:48px;border-radius:14px;background:rgba(255,255,255,.22);
+    border:1px solid rgba(255,255,255,.35);display:flex;align-items:center;justify-content:center;flex:none}
+  .D .top h2{margin:0;font-size:18px;letter-spacing:-.01em}
+  .D .top p{margin:2px 0 0;font-size:12.5px;color:rgba(255,255,255,.78)}
+  .D .top .live{margin-left:auto;display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;
+    background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.28);padding:5px 11px;border-radius:999px}
+  .D .top .live i{width:8px;height:8px;border-radius:50%;background:#86efac;box-shadow:0 0 8px #86efac}
+  .D .glasskey{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);
+    border-radius:13px;padding:14px 16px;display:flex;align-items:center;gap:10px;margin-bottom:14px}
+  .D .glasskey .kbd{font-weight:700;font-size:12px;background:rgba(255,255,255,.22);border:1px solid rgba(255,255,255,.4);
+    border-radius:7px;padding:3px 9px}
+  .D .glasskey span{font-size:13px;color:rgba(255,255,255,.85)}
+  .D .langs{display:flex;gap:8px;margin-bottom:14px}
+  .D .lang{flex:1;text-align:center;font-size:13px;font-weight:600;padding:9px;border-radius:11px;
+    background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.22);color:rgba(255,255,255,.85)}
+  .D .lang.on{background:rgba(255,255,255,.9);color:#6d28d9;border-color:transparent}
+  .D .mic{display:flex;align-items:center;justify-content:space-between;font-size:13px;
+    background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.22);border-radius:11px;padding:11px 14px;color:rgba(255,255,255,.9)}
+  .D .priv{margin-top:15px;text-align:center;font-size:12px;color:rgba(255,255,255,.8)}
+
+  .hint{max-width:1180px;margin:36px auto 0;text-align:center;color:var(--muted);font-size:13.5px}
+</style>
+</head>
+<body>
+
+<div class="page-head">
+  <h1><span class="ghost">👻</span> Spuk — Main Window</h1>
+  <p>Four directions for the real app window (opens from the menu-bar/tray icon).<br>
+     Tell me a number — or mix &amp; match elements you like across them.</p>
+</div>
+
+<div class="grid">
+
+  <!-- ============ A — FRIENDLY ============ -->
+  <section class="mock A">
+    <div class="label"><span class="num">1</span><span class="name">Cozy</span>
+      <span class="tag">— warm &amp; reassuring, built for non-technical users (your parents)</span></div>
+    <div class="win">
+      <div class="bar"><div class="dots"><i class="r"></i><i class="y"></i><i class="g"></i></div>
+        <div class="title">Spuk</div></div>
+      <div class="body">
+        <div class="avatar">
+          <svg class="gicon" width="40" height="40" viewBox="0 0 40 40" fill="none"><path d="M20 5c-7 0-12 5-12 12v15l4-3 4 3 4-3 4 3 4-3V17c0-7-5-12-12-12z" fill="#fff"/><circle cx="16" cy="18" r="2.4" fill="#7c3aed"/><circle cx="24" cy="18" r="2.4" fill="#7c3aed"/></svg>
+          <span class="ring"></span>
+        </div>
+        <h2>Spuk is ready</h2>
+        <div class="sub">Hold the keys anywhere and just talk.</div>
+        <div class="hero">Hold&nbsp; ⌃ Control&nbsp;+&nbsp;⌥ Option&nbsp; to talk
+          <small>Let go and your words appear where you're typing</small></div>
+        <div class="langs">
+          <span class="lang on">English</span>
+          <span class="lang">Deutsch</span>
+          <span class="lang">Polski</span>
+        </div>
+        <div class="mic"><span>🎤 MacBook Microphone</span><span class="car">▾</span></div>
+        <div class="priv">🔒 Everything stays on this computer. Nothing is uploaded.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ B — PRO DASHBOARD ============ -->
+  <section class="mock B">
+    <div class="label"><span class="num">2</span><span class="name">Studio</span>
+      <span class="tag">— dark, sidebar, power-user dashboard (Wispr/Linear vibe)</span></div>
+    <div class="win">
+      <div class="bar"><div class="dots"><i class="r"></i><i class="y"></i><i class="g"></i></div>
+        <div class="title">Spuk</div></div>
+      <div class="layout">
+        <div class="side">
+          <div class="brand">
+            <svg width="20" height="20" viewBox="0 0 40 40"><rect width="40" height="40" rx="11" fill="#8b5cf6"/><path d="M20 9c-5.5 0-9 4-9 9v12l3-2.2 3 2.2 3-2.2 3 2.2 3-2.2V18c0-5-3.5-9-9-9z" fill="#fff"/></svg>
+            Spuk</div>
+          <nav class="nav">
+            <a class="on"><span class="ic"></span>Home</a>
+            <a><span class="ic"></span>History</a>
+            <a><span class="ic"></span>Settings</a>
+            <a><span class="ic"></span>About</a>
+          </nav>
+        </div>
+        <div class="main">
+          <div class="stat"><span class="d"></span>Listening — ready <small>model: small · on-device</small></div>
+          <div class="key"><span>Push&nbsp;to&nbsp;talk</span><span class="kbd">⌃ Ctrl</span><span class="kbd">⌥ Opt</span>
+            <span style="margin-left:auto" class="kbd">⌃⇧L lang</span></div>
+          <div class="seg"><b class="on">EN</b><b>DE</b><b>PL</b></div>
+          <div class="lbl">Microphone</div>
+          <div class="seg"><b class="on" style="text-align:left;flex:1">MacBook Microphone&nbsp; ▾</b></div>
+          <div class="lbl">Recent</div>
+          <div class="hist">
+            <div class="it"><span>"Send me the report by Friday…"</span><time>2m</time></div>
+            <div class="it"><span>"Treffen wir uns um drei?"</span><time>14m</time></div>
+            <div class="it"><span>"Dziękuję, do zobaczenia."</span><time>1h</time></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ C — MINIMAL ============ -->
+  <section class="mock C">
+    <div class="label"><span class="num">3</span><span class="name">Settings</span>
+      <span class="tag">— clean, native, like macOS System Settings; quiet &amp; familiar</span></div>
+    <div class="win">
+      <div class="bar"><div class="dots"><i class="r"></i><i class="y"></i><i class="g"></i></div>
+        <div class="title">Spuk</div></div>
+      <div class="body">
+        <div class="hd">
+          <span class="g"><svg width="24" height="24" viewBox="0 0 40 40"><path d="M20 7c-6 0-10 4.5-10 10.5V32l3.3-2.5L16.7 32 20 29.5 23.3 32l3.4-2.5L30 32V17.5C30 11.5 26 7 20 7z" fill="#fff"/><circle cx="16.5" cy="18.5" r="2" fill="#8b5cf6"/><circle cx="23.5" cy="18.5" r="2" fill="#8b5cf6"/></svg></span>
+          <div><h2>Spuk</h2><p>Private dictation · running</p></div>
+          <span class="badge">Ready</span>
+        </div>
+        <div class="rows">
+          <div class="rw"><span class="k">Hold-to-talk</span><span class="v"><span class="pill">⌃ Ctrl</span><span class="pill">⌥ Option</span></span></div>
+          <div class="rw"><span class="k">Language</span><span class="v"><span class="pill on">EN</span><span class="pill">DE</span><span class="pill">PL</span></span></div>
+          <div class="rw"><span class="k">Microphone</span><span class="v">MacBook Microphone <span class="chev">▾</span></span></div>
+          <div class="rw"><span class="k">Start at login</span><span class="v">On <span class="chev">▾</span></span></div>
+          <div class="rw"><span class="k">Privacy</span><span class="v">100% on-device 🔒</span></div>
+        </div>
+        <div class="foot"><span class="pr">v0.2.0 · no account, no internet</span><span class="quit">Quit Spuk</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ D — GLASS ============ -->
+  <section class="mock D">
+    <div class="label"><span class="num">4</span><span class="name">Aurora</span>
+      <span class="tag">— translucent “liquid glass”, premium &amp; modern (iOS 26 feel)</span></div>
+    <div class="win">
+      <div class="scene">
+        <div class="card">
+          <div class="top">
+            <span class="g"><svg width="26" height="26" viewBox="0 0 40 40"><path d="M20 7c-6 0-10 4.5-10 10.5V32l3.3-2.5L16.7 32 20 29.5 23.3 32l3.4-2.5L30 32V17.5C30 11.5 26 7 20 7z" fill="#fff"/><circle cx="16.5" cy="18.5" r="2" fill="#7c3aed"/><circle cx="23.5" cy="18.5" r="2" fill="#7c3aed"/></svg></span>
+            <div><h2>Spuk</h2><p>Talk, and your words appear</p></div>
+            <span class="live"><i></i>Ready</span>
+          </div>
+          <div class="glasskey"><span class="kbd">⌃ Ctrl</span><span class="kbd">⌥ Option</span>
+            <span style="margin-left:auto">Hold &amp; speak</span></div>
+          <div class="langs"><span class="lang on">English</span><span class="lang">Deutsch</span><span class="lang">Polski</span></div>
+          <div class="mic"><span>🎤 MacBook Microphone</span><span>▾</span></div>
+          <div class="priv">🔒 Free forever · runs entirely on your computer</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<p class="hint">Mockups only — not wired up. Pick a number (1–4), or say “2 but the privacy footer from 1”, etc.</p>
+
+</body>
+</html>

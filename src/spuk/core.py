@@ -33,10 +33,25 @@ class SpukCore:
         self._transcriber = build_transcriber(config.transcribe)
         self._post = build_post_processor(config.post_process)
 
+        # The user's curated set of languages (mutable at runtime) and the active
+        # one. Seeded from config (which already overlays the user's saved choices).
+        self._languages: list[str] = list(config.transcribe.languages)
         self._language = config.transcribe.default_language
+
+        # Apply a previously-saved microphone choice, if any.
+        from .settings_store import load_user_settings
+
+        saved = load_user_settings()
+        if "device" in saved:
+            try:
+                self._recorder.device = saved["device"]
+            except Exception:  # noqa: BLE001
+                pass
+
         # Optional observers so a UI can react. These fire from the hotkey
         # listener thread — a Qt UI must marshal them onto the main thread.
         self.on_language_change: Callable[[str], None] | None = None
+        self.on_languages_change: Callable[[tuple[str, ...]], None] | None = None
         self.on_recording_change: Callable[[bool], None] | None = None
         self.on_transcript: Callable[[str], None] | None = None
 
@@ -48,26 +63,72 @@ class SpukCore:
 
     @property
     def languages(self) -> tuple[str, ...]:
-        return self._cfg.transcribe.languages
+        return tuple(self._languages)
 
     def set_language(self, lang: str) -> None:
-        if lang not in self._cfg.transcribe.languages:
+        if lang not in self._languages:
             log.warning("Ignoring unknown language %r", lang)
             return
         self._language = lang
         log.info("Language → %s", lang)
+        self._persist()
         if self.on_language_change:
             self.on_language_change(lang)
+
+    def add_language(self, code: str) -> None:
+        """Add a language to the curated set (and make it active)."""
+        from .languages import is_supported
+
+        if not is_supported(code):
+            log.warning("Ignoring unsupported language %r", code)
+            return
+        if code not in self._languages:
+            self._languages.append(code)
+            log.info("Added language %s (now: %s)", code, ", ".join(self._languages))
+            self._persist()
+            if self.on_languages_change:
+                self.on_languages_change(tuple(self._languages))
+        self.set_language(code)
+
+    def remove_language(self, code: str) -> None:
+        """Remove a language from the curated set. Keeps at least one."""
+        if code not in self._languages:
+            return
+        if len(self._languages) <= 1:
+            log.warning("Refusing to remove the last language (%s).", code)
+            return
+        self._languages.remove(code)
+        log.info("Removed language %s (now: %s)", code, ", ".join(self._languages))
+        if self._language == code:
+            self._language = self._languages[0]
+            if self.on_language_change:
+                self.on_language_change(self._language)
+        self._persist()
+        if self.on_languages_change:
+            self.on_languages_change(tuple(self._languages))
 
     def set_input_device(self, device: int | str | None) -> None:
         """Choose the microphone (sounddevice index or name; None = system default)."""
         self._recorder.device = device
         log.info("Microphone → %s", device if device is not None else "system default")
+        self._persist()
 
     def cycle_language(self) -> None:
-        langs = self._cfg.transcribe.languages
+        langs = self._languages
+        if self._language not in langs:
+            self._language = langs[0]
         nxt = langs[(langs.index(self._language) + 1) % len(langs)]
         self.set_language(nxt)
+
+    def _persist(self) -> None:
+        """Save the user's current languages / active language / microphone."""
+        from .settings_store import update_user_settings
+
+        update_user_settings(
+            languages=list(self._languages),
+            default_language=self._language,
+            device=self._recorder.device,
+        )
 
     # --- lifecycle --------------------------------------------------------
 
