@@ -7,8 +7,9 @@ rules — this is the short version.
 
 Private, **local, free** press-to-talk dictation for **macOS and Windows**.
 Hotkey → mic → local Whisper (faster-whisper) → paste into the focused field.
-Languages: English (default), German, Polish — switchable live. Runs as a
-cross-platform tray app; built for the author and family.
+Languages: any of the ~100 the multilingual Whisper model supports — English, German,
+and Polish ship as the starter set, and users add more from Settings (⚙); switchable
+live. Runs as a cross-platform tray app; built for the author and family.
 
 ## Hard constraints (do not violate)
 

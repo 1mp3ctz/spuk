@@ -6,7 +6,7 @@
 engine           = "faster-whisper"  # faster-whisper | mlx | whispercpp (faster-whisper is cross-platform; default)
 model            = "small"           # smallest multilingual model with good accuracy; bump to "large-v3-turbo" if needed
 default_language = "en"              # English first. Switch live from the tray menu or cycle hotkey.
-languages        = ["en", "de", "pl"]  # the only languages offered: English, German, Polish
+languages        = ["en", "de", "pl"]  # starter set; add any of ~100 Whisper languages from Settings (⚙)
 device           = "cpu"             # cross-platform safe default. CTranslate2 has no Metal backend on macOS.
 compute_type     = "int8"            # fast, small footprint; good on modest hardware (parents' PCs)
 vad_filter       = true              # trim leading/trailing silence
