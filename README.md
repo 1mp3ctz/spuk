@@ -37,8 +37,9 @@ uv sync
 uv run python -m spuk
 ```
 
-Focus any text field, **hold `Ctrl+Alt+Space`**, speak, release. First run
-downloads the `small` model (~480 MB). Cycle language with **`Ctrl+Alt+L`**.
+Focus any text field, **hold `Ctrl+Option`** (Mac) / **`Strg+Alt`** (Windows),
+speak, release. First run downloads the `small` model (~480 MB). Cycle language
+with **`Ctrl+Shift+L`**.
 
 ### macOS permissions (one time)
 
