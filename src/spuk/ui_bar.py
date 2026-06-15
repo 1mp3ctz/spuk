@@ -1,4 +1,4 @@
-"""Wispr-Flow-style floating bar (Qt / PySide6).
+"""Floating dictation bar (Qt / PySide6).
 
 A small, frameless, always-on-top pill anchored at the bottom-center of the
 screen. It expands on hover to show the current language, a hold-to-talk button,
