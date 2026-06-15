@@ -1,0 +1,153 @@
+name: Release Spuk
+
+# Cut a release by pushing a tag like v0.1.0, or run manually from the Actions tab.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write   # needed for the release job to create/upload a GitHub Release
+
+jobs:
+  # ---------------------------------------------------------------------------
+  build-macos:
+    name: Build macOS (.app)
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Create Python 3.11 environment
+        # Runner disks are normal APFS (not exFAT), so no UV_LINK_MODE=copy needed,
+        # and the .app's Qt framework symlinks build correctly here.
+        run: uv venv --python 3.11 .venv
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Build Spuk.app with PyInstaller
+        run: |
+          uv run --with pyinstaller pyinstaller \
+            --clean --noconfirm --workpath build/pyi --distpath dist \
+            packaging/spuk.spec
+
+      - name: Sanity check the bundle exists
+        run: |
+          test -d "dist/Spuk.app" || { echo "Spuk.app not produced"; exit 1; }
+          echo "Built bundle:"; du -sh dist/Spuk.app || true
+
+      - name: Ad-hoc sign (best-effort; unsigned distribution either way)
+        # No paid Apple cert in CI, so this is an ad-hoc signature only. It does NOT
+        # pass strict Gatekeeper — users still right-click -> Open on first launch.
+        # Best-effort so a signing hiccup never fails the release.
+        continue-on-error: true
+        run: |
+          find dist/Spuk.app -exec xattr -d com.apple.FinderInfo {} \; 2>/dev/null || true
+          xattr -cr dist/Spuk.app || true
+          codesign --force --deep --sign - dist/Spuk.app || true
+
+      - name: Zip the .app (ditto preserves symlinks + metadata)
+        # plain `zip` corrupts a macOS .app bundle (Qt framework symlinks); use ditto.
+        run: ditto -c -k --sequesterRsrc --keepParent dist/Spuk.app Spuk-macos.zip
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Spuk-macos
+          path: Spuk-macos.zip
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  build-windows:
+    name: Build Windows (folder + .exe)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Create Python 3.11 environment
+        run: uv venv --python 3.11 .venv
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Build Spuk.exe with PyInstaller
+        # On Windows the spec's BUNDLE step is a no-op; PyInstaller emits the
+        # COLLECT one-folder build at dist\Spuk\ containing Spuk.exe.
+        run: |
+          uv run --with pyinstaller pyinstaller `
+            --clean --noconfirm --workpath build\pyi --distpath dist `
+            packaging\spuk.spec
+
+      - name: Sanity check the build exists
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "dist\Spuk\Spuk.exe")) {
+            Write-Error "dist\Spuk\Spuk.exe not produced"; exit 1
+          }
+          Write-Host "Built folder:"
+          Get-ChildItem dist\Spuk | Select-Object Name, Length | Out-String | Write-Host
+
+      - name: Zip the Spuk folder
+        shell: pwsh
+        run: Compress-Archive -Path dist\Spuk -DestinationPath Spuk-windows.zip -Force
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Spuk-windows
+          path: Spuk-windows.zip
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  release:
+    name: Publish GitHub Release
+    needs: [build-macos, build-windows]
+    runs-on: ubuntu-latest
+    # Only publish a Release when triggered by a tag. A manual (workflow_dispatch)
+    # run still builds + uploads artifacts above, but won't create a Release.
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Spuk-macos
+          path: dist-macos
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Spuk-windows
+          path: dist-windows
+
+      - name: Create / update the GitHub Release and attach binaries
+        uses: softprops/action-gh-release@v2
+        with:
+          fail_on_unmatched_files: true
+          generate_release_notes: true
+          files: |
+            dist-macos/Spuk-macos.zip
+            dist-windows/Spuk-windows.zip
+          body: |
+            ## Spuk — download below 👻
+
+            Two downloads, pick one:
+
+            - **Mac:** `Spuk-macos.zip`
+            - **Windows:** `Spuk-windows.zip`
+
+            See the [README install guide](https://github.com/1mp3ctz/spuk#%EF%B8%8F-download--install)
+            for the simple, step-by-step setup.
+
+            > ⚠️ These builds are **unsigned**. macOS: right-click → **Open** the first
+            > time. Windows: **More info → Run anyway** the first time. The first launch
+            > downloads the speech model (~480 MB) and needs internet once; offline and
+            > free after that.
