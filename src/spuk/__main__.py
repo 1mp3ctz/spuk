@@ -19,7 +19,12 @@ def main() -> None:
     parser.add_argument(
         "--headless",
         action="store_true",
-        help="Run without the tray icon (terminal only).",
+        help="Run with no UI (terminal only).",
+    )
+    parser.add_argument(
+        "--tray",
+        action="store_true",
+        help="Run with the menu-bar/tray icon instead of the floating bar.",
     )
     args = parser.parse_args()
 
@@ -44,15 +49,27 @@ def main() -> None:
         core.run_headless()
         return
 
+    if args.tray:
+        try:
+            from .tray import run_tray
+        except Exception as exc:  # pystray/Pillow missing
+            logging.getLogger("spuk").warning("Tray unavailable (%s) — headless.", exc)
+            core.warm()
+            core.run_headless()
+            return
+        run_tray(config, core)
+        return
+
+    # Default: the floating bar (Qt). Falls back to headless if Qt is missing.
     try:
-        from .tray import run_tray
-    except Exception as exc:  # pystray/Pillow missing or no display
-        logging.getLogger("spuk").warning("Tray unavailable (%s) — running headless.", exc)
+        from .ui_bar import run_bar
+    except Exception as exc:  # PySide6 missing or no display
+        logging.getLogger("spuk").warning("Floating bar unavailable (%s) — headless.", exc)
         core.warm()
         core.run_headless()
         return
 
-    run_tray(config, core)
+    run_bar(config, core)
 
 
 if __name__ == "__main__":
