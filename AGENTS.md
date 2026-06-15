@@ -9,9 +9,12 @@ Spuk is a private, local, free macOS dictation tool. Read this before changing c
 2. **Never spend money silently.** The only paid path is Claude post-processing,
    which is OFF by default and gated behind two flags + a daily cap (see
    `src/spuk/postprocess.py`). Do not weaken these guards. Do not hardcode API keys.
-3. **German-first.** Default language is German; use multilingual Whisper models
-   (never the `.en` variants). Keep umlaut-safe clipboard paste as the default
-   insertion method — do not switch to per-character keystroke injection.
+3. **Multi-language, cross-platform.** Supported languages are English (default),
+   German, Polish — use multilingual Whisper models (never the `.en` variants),
+   switchable at runtime. Keep Unicode-safe clipboard paste as the default
+   insertion method (umlauts ä ö ü, Polish ą ę ł ó ż) — never per-character
+   keystroke injection. Code must run on **both macOS and Windows** from one
+   codebase (platform-specific bits isolated, e.g. the paste modifier in `paste.py`).
 
 ## Environment
 

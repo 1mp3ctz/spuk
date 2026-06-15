@@ -7,20 +7,38 @@ system boundaries, fail fast with clear messages).
 
 from __future__ import annotations
 
+import sys
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
 # Project root = two levels up from this file (src/spuk/config.py -> project root).
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_CONFIG_PATH = PROJECT_ROOT / "config.toml"
+
+
+def _default_config_path() -> Path:
+    """Find config.toml, working both in dev and inside a PyInstaller bundle.
+
+    Order: a user-editable config.toml next to the executable, then the copy
+    bundled with a frozen app, then the repo root for normal `python -m spuk`.
+    """
+    if getattr(sys, "frozen", False):  # running from a PyInstaller bundle
+        beside_exe = Path(sys.executable).resolve().parent / "config.toml"
+        if beside_exe.exists():
+            return beside_exe
+        return Path(getattr(sys, "_MEIPASS", PROJECT_ROOT)) / "config.toml"
+    return PROJECT_ROOT / "config.toml"
+
+
+DEFAULT_CONFIG_PATH = _default_config_path()
 
 
 @dataclass(frozen=True)
 class TranscribeConfig:
     engine: str
     model: str
-    language: str
+    default_language: str
+    languages: tuple[str, ...]
     device: str
     compute_type: str
     vad_filter: bool
@@ -31,6 +49,7 @@ class TranscribeConfig:
 class HotkeyConfig:
     mode: str  # "push_to_talk" | "toggle"
     key: str
+    cycle_language: str
 
 
 @dataclass(frozen=True)
@@ -66,7 +85,9 @@ def load_config(path: Path | None = None) -> Config:
         raw = tomllib.load(f)
 
     try:
-        transcribe = TranscribeConfig(**raw["transcribe"])
+        t = dict(raw["transcribe"])
+        t["languages"] = tuple(t.get("languages", []))  # list -> immutable tuple
+        transcribe = TranscribeConfig(**t)
         hotkey = HotkeyConfig(**raw["hotkey"])
         audio = AudioConfig(**raw["audio"])
         post_process = PostProcessConfig(**raw["post_process"])
@@ -75,5 +96,13 @@ def load_config(path: Path | None = None) -> Config:
 
     if hotkey.mode not in ("push_to_talk", "toggle"):
         raise ValueError(f"hotkey.mode must be 'push_to_talk' or 'toggle', got {hotkey.mode!r}")
+
+    if not transcribe.languages:
+        raise ValueError("transcribe.languages must list at least one language code.")
+    if transcribe.default_language not in transcribe.languages:
+        raise ValueError(
+            f"transcribe.default_language {transcribe.default_language!r} "
+            f"must be one of transcribe.languages {transcribe.languages}."
+        )
 
     return Config(transcribe=transcribe, hotkey=hotkey, audio=audio, post_process=post_process)

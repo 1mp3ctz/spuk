@@ -5,15 +5,18 @@ rules — this is the short version.
 
 ## What Spuk is
 
-Private, **local, free** macOS dictation (Wispr Flow clone). Hotkey → mic →
-local Whisper (faster-whisper) → paste into the focused field. German-first.
+Private, **local, free** dictation (Wispr Flow clone) for **macOS and Windows**.
+Hotkey → mic → local Whisper (faster-whisper) → paste into the focused field.
+Languages: English (default), German, Polish — switchable live. Runs as a
+cross-platform tray app; built for the author and family.
 
 ## Hard constraints (do not violate)
 
 - Core loop stays 100% local and free — no required network calls.
+- Cross-platform: one codebase runs on macOS + Windows. Isolate platform bits.
 - Claude post-processing is optional, OFF by default, double-gated, capped, and
   logged. Never weaken the guards in `src/spuk/postprocess.py`. Never hardcode keys.
-- Use multilingual Whisper models; keep umlaut-safe clipboard paste as default.
+- Use multilingual Whisper models; keep Unicode-safe clipboard paste as default.
 
 ## Run it
 
@@ -36,10 +39,14 @@ src/spuk/
   hotkey.py        global push-to-talk / toggle (pynput)
   paste.py         clipboard save → set → Cmd+V → restore
   postprocess.py   optional, OFF-by-default text cleanup (gated)
-  core.py          wires the loop together
+  core.py          SpukCore engine + runtime language state (UI-agnostic)
+  tray.py          cross-platform system-tray UI (pystray)
+  __main__.py      entry point (tray by default, --headless for terminal)
 scripts/check_env.py     Phase 0 sanity check
+packaging/               PyInstaller spec + build_macos.sh / build_windows.ps1
 docs/                    ARCHITECTURE.md, PLAN.md
 ```
 
-Current status: **Phase 1 complete** (Python prototype). Next: Phase 2 (latency,
-robustness), then the native Swift menu-bar app (Phase 3).
+Current status: **Phase 1 + cross-platform (1.5) complete in code** (Mac+Win tray
+app, en/de/pl). Next: live verification on hardware, then Phase 2 (latency,
+robustness). The native-Swift plan is superseded by the cross-platform Python app.

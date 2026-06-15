@@ -15,6 +15,7 @@ NSPasteboard save/restore is a Phase 2 upgrade.
 from __future__ import annotations
 
 import logging
+import platform
 import time
 
 import pyperclip
@@ -23,6 +24,10 @@ from pynput.keyboard import Controller, Key
 log = logging.getLogger("spuk.paste")
 
 _keyboard = Controller()
+
+# Paste shortcut differs by OS: Cmd+V on macOS, Ctrl+V on Windows/Linux.
+_IS_MAC = platform.system() == "Darwin"
+_PASTE_MODIFIER = Key.cmd if _IS_MAC else Key.ctrl
 
 # Small settle delays. Too short and the target app pastes stale clipboard
 # contents or we restore before it has read the new value.
@@ -55,7 +60,7 @@ def paste_text(text: str) -> None:
 
 
 def _send_cmd_v() -> None:
-    _keyboard.press(Key.cmd)
+    _keyboard.press(_PASTE_MODIFIER)
     _keyboard.press("v")
     _keyboard.release("v")
-    _keyboard.release(Key.cmd)
+    _keyboard.release(_PASTE_MODIFIER)
