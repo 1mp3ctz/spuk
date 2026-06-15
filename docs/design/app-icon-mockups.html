@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Spuk — App Icon Concepts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --v1:#8b5cf6; --v2:#7c3aed; --v3:#6d28d9; --deep:#3b0764;
+    --ink:#ece8f7; --muted:#9a92b8; --panel:#171225; --line:rgba(255,255,255,.08);
+    --aurora:linear-gradient(135deg,#8b5cf6 0%,#7c3aed 50%,#6d28d9 100%);
+    --aurora-deep:linear-gradient(150deg,#a78bfa 0%,#7c3aed 45%,#3b0764 100%);
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(124,58,237,.22), transparent 60%),
+      #0e0a18;
+    color:var(--ink); font-family:Inter,system-ui,sans-serif; line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1080px; margin:0 auto; padding:64px 28px 96px}
+  .eyebrow{font-family:"Space Grotesk"; letter-spacing:.32em; text-transform:uppercase;
+    font-size:12px; color:var(--v1); font-weight:500; margin:0 0 14px}
+  h1{font-family:"Space Grotesk"; font-weight:700; font-size:clamp(34px,5vw,56px);
+    line-height:1.02; margin:0 0 16px; letter-spacing:-.01em}
+  h1 .ghost{color:#fff}
+  .lede{max-width:60ch; color:var(--muted); font-size:17px; margin:0 0 8px}
+  .tokens{display:flex; flex-wrap:wrap; gap:10px; margin:26px 0 0}
+  .swatch{display:flex; align-items:center; gap:8px; font-size:12px; color:var(--muted);
+    background:var(--panel); border:1px solid var(--line); border-radius:999px; padding:6px 12px 6px 6px}
+  .dot{width:18px; height:18px; border-radius:50%}
+
+  .section-label{font-family:"Space Grotesk"; font-size:13px; letter-spacing:.18em;
+    text-transform:uppercase; color:var(--muted); margin:72px 0 22px; padding-bottom:12px;
+    border-bottom:1px solid var(--line)}
+
+  .grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:22px}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:20px; padding:26px;
+    position:relative; overflow:hidden}
+  .card.lead{border-color:rgba(167,139,250,.5); box-shadow:0 0 0 1px rgba(167,139,250,.25), 0 30px 80px -40px rgba(124,58,237,.6)}
+  .badge{position:absolute; top:18px; right:18px; font-family:"Space Grotesk"; font-size:11px;
+    letter-spacing:.12em; text-transform:uppercase; color:#fff; background:var(--v2);
+    border-radius:999px; padding:5px 11px; font-weight:500}
+  .iconwrap{display:flex; justify-content:center; padding:14px 0 24px}
+
+  /* macOS squircle tile */
+  .tile{width:200px; height:200px; border-radius:45px; position:relative; overflow:hidden;
+    box-shadow:0 22px 50px -18px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.25)}
+  .tile.aurora{background:var(--aurora)}
+  .tile.dark{background:radial-gradient(120% 120% at 30% 20%, #2a1758 0%, #150b2e 60%, #0c0620 100%)}
+  .tile::after{content:""; position:absolute; inset:0; border-radius:inherit; pointer-events:none;
+    background:radial-gradient(80% 60% at 28% 18%, rgba(255,255,255,.34), transparent 60%)}
+  .tile svg{position:absolute; inset:0; width:100%; height:100%}
+
+  .name{font-family:"Space Grotesk"; font-weight:700; font-size:20px; margin:0 0 6px}
+  .why{color:var(--muted); font-size:14.5px; margin:0}
+
+  /* size legibility strip */
+  .sizes{display:flex; align-items:flex-end; gap:18px; margin-top:22px;
+    padding-top:20px; border-top:1px dashed var(--line)}
+  .size{display:flex; flex-direction:column; align-items:center; gap:7px}
+  .size .t{border-radius:23%; overflow:hidden; position:relative; box-shadow:0 4px 10px -4px rgba(0,0,0,.6)}
+  .size .t.aurora{background:var(--aurora)} .size .t.dark{background:radial-gradient(120% 120% at 30% 20%, #2a1758, #0c0620)}
+  .size .t svg{position:absolute; inset:0; width:100%; height:100%}
+  .size .cap{font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums}
+  .s64{width:64px;height:64px} .s32{width:32px;height:32px} .s16{width:16px;height:16px;border-radius:30%}
+
+  /* platform comparison */
+  .platforms{display:flex; gap:40px; flex-wrap:wrap; align-items:flex-end}
+  .pf{display:flex; flex-direction:column; align-items:center; gap:12px}
+  .pf .cap{font-size:12px; color:var(--muted)}
+  .mac{width:160px;height:160px;border-radius:36px}
+  .win{width:160px;height:160px;border-radius:24px}
+  .pf .t{position:relative; overflow:hidden; box-shadow:0 18px 40px -16px rgba(0,0,0,.7)}
+  .pf .t.aurora{background:var(--aurora)} .pf .t svg{position:absolute;inset:0;width:100%;height:100%}
+
+  footer{margin-top:80px; color:var(--muted); font-size:13.5px; border-top:1px solid var(--line); padding-top:22px}
+  code{background:#221a36; padding:2px 7px; border-radius:6px; font-size:12.5px; color:#c4b5fd}
+</style>
+</head>
+<body>
+
+<!-- ============ reusable glyphs ============ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="aurora" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#a78bfa"/>
+      <stop offset=".5" stop-color="#8b5cf6"/>
+      <stop offset="1" stop-color="#7c3aed"/>
+    </linearGradient>
+
+    <!-- Concept 1: Whisper Wave — ghost whose wisps are a voice waveform -->
+    <symbol id="g-wave" viewBox="0 0 120 120">
+      <mask id="m-wave">
+        <rect width="120" height="120" fill="black"/>
+        <path d="M26,60 C26,41 41,25 60,25 C79,25 94,41 94,60 L94,76 L26,76 Z" fill="white"/>
+        <rect x="28" y="64" width="8" height="28" rx="4" fill="white"/>
+        <rect x="42" y="64" width="8" height="38" rx="4" fill="white"/>
+        <rect x="56" y="64" width="8" height="22" rx="4" fill="white"/>
+        <rect x="70" y="64" width="8" height="34" rx="4" fill="white"/>
+        <rect x="84" y="64" width="8" height="26" rx="4" fill="white"/>
+        <ellipse cx="50" cy="52" rx="5" ry="6" fill="black"/>
+        <ellipse cx="70" cy="52" rx="5" ry="6" fill="black"/>
+      </mask>
+      <rect width="120" height="120" fill="white" mask="url(#m-wave)"/>
+    </symbol>
+
+    <!-- Concept 2: Aurora Glass — ghost is a window onto the gradient, on near-black -->
+    <symbol id="g-glass" viewBox="0 0 120 120">
+      <path d="M27,62 C27,42 42,26 60,26 C78,26 93,42 93,62 L93,84 Q93,93 84,93 L36,93 Q27,93 27,84 Z"
+            fill="url(#aurora)" stroke="rgba(255,255,255,.55)" stroke-width="2"/>
+      <ellipse cx="51" cy="55" rx="5" ry="6.2" fill="#fff"/>
+      <ellipse cx="71" cy="55" rx="5" ry="6.2" fill="#fff"/>
+      <path d="M53,72 q7,6 14,0" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+    </symbol>
+
+    <!-- Concept 3: Soft Classic — clean white ghost, rounded base, tiny mouth -->
+    <symbol id="g-classic" viewBox="0 0 120 120">
+      <mask id="m-classic">
+        <rect width="120" height="120" fill="black"/>
+        <path d="M27,62 C27,42 42,26 60,26 C78,26 93,42 93,62 L93,84 Q93,93 84,93 L36,93 Q27,93 27,84 Z" fill="white"/>
+        <ellipse cx="51" cy="54" rx="5" ry="6.2" fill="black"/>
+        <ellipse cx="71" cy="54" rx="5" ry="6.2" fill="black"/>
+        <ellipse cx="61" cy="71" rx="3.4" ry="4.2" fill="black"/>
+      </mask>
+      <rect width="120" height="120" fill="white" mask="url(#m-classic)"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="wrap">
+  <p class="eyebrow">Spuk · App Icon</p>
+  <h1>A ghost that <span class="ghost">speaks</span>.</h1>
+  <p class="lede">Right now Spuk ships with no app icon, so it shows the blank default on the Dock,
+    in Finder, and on Windows. These three directions give it a real identity — built from the brand's
+    Aurora purple and the one idea unique to Spuk: a <strong>ghost whose wisps form a voice waveform</strong>,
+    because the app turns your voice into text.</p>
+
+  <div class="tokens">
+    <span class="swatch"><span class="dot" style="background:#8b5cf6"></span>#8b5cf6</span>
+    <span class="swatch"><span class="dot" style="background:#7c3aed"></span>#7c3aed</span>
+    <span class="swatch"><span class="dot" style="background:#6d28d9"></span>#6d28d9</span>
+    <span class="swatch"><span class="dot" style="background:#3b0764"></span>#3b0764</span>
+    <span class="swatch"><span class="dot" style="background:#ffffff"></span>#ffffff glyph</span>
+  </div>
+
+  <p class="section-label">Three directions</p>
+  <div class="grid">
+
+    <div class="card lead">
+      <span class="badge">Recommended</span>
+      <div class="iconwrap"><div class="tile aurora"><svg><use href="#g-wave"/></svg></div></div>
+      <p class="name">1 · Whisper Wave</p>
+      <p class="why">The ghost's wisps become a voice waveform — ghost + dictation in one mark. The
+        idea no generic icon arrives at. Reads as a friendly ghost up close, an equaliser at a glance.</p>
+      <div class="sizes">
+        <div class="size"><div class="t aurora s64"><svg><use href="#g-wave"/></svg></div><span class="cap">64</span></div>
+        <div class="size"><div class="t aurora s32"><svg><use href="#g-wave"/></svg></div><span class="cap">32</span></div>
+        <div class="size"><div class="t aurora s16"><svg><use href="#g-wave"/></svg></div><span class="cap">16 · menu bar</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="iconwrap"><div class="tile dark"><svg><use href="#g-glass"/></svg></div></div>
+      <p class="name">2 · Aurora Glass</p>
+      <p class="why">The ghost is a lit window onto the Aurora gradient, floating on near-black —
+        the same glass language as the in-app pill and Settings. Premium and atmospheric; a touch
+        less punchy at tiny sizes.</p>
+      <div class="sizes">
+        <div class="size"><div class="t dark s64"><svg><use href="#g-glass"/></svg></div><span class="cap">64</span></div>
+        <div class="size"><div class="t dark s32"><svg><use href="#g-glass"/></svg></div><span class="cap">32</span></div>
+        <div class="size"><div class="t dark s16"><svg><use href="#g-glass"/></svg></div><span class="cap">16 · menu bar</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="iconwrap"><div class="tile aurora"><svg><use href="#g-classic"/></svg></div></div>
+      <p class="name">3 · Soft Classic</p>
+      <p class="why">A clean, friendly ghost on the Aurora gradient — closest to the current in-app
+        mascot. The safe, instantly-readable option that scales perfectly, but doesn't say "voice".</p>
+      <div class="sizes">
+        <div class="size"><div class="t aurora s64"><svg><use href="#g-classic"/></svg></div><span class="cap">64</span></div>
+        <div class="size"><div class="t aurora s32"><svg><use href="#g-classic"/></svg></div><span class="cap">32</span></div>
+        <div class="size"><div class="t aurora s16"><svg><use href="#g-classic"/></svg></div><span class="cap">16 · menu bar</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <p class="section-label">Recommended, on both platforms</p>
+  <div class="platforms">
+    <div class="pf"><div class="t aurora mac"><svg><use href="#g-wave"/></svg></div><span class="cap">macOS · squircle</span></div>
+    <div class="pf"><div class="t aurora win"><svg><use href="#g-wave"/></svg></div><span class="cap">Windows · rounded square</span></div>
+    <div class="pf"><div class="t aurora s64"><svg><use href="#g-wave"/></svg></div><span class="cap">Dock / taskbar</span></div>
+    <div class="pf"><div class="t aurora s16" style="border-radius:30%"><svg><use href="#g-wave"/></svg></div><span class="cap">16px tray</span></div>
+  </div>
+
+  <footer>
+    <p>Shapes are live SVG — final icons would be exported to <code>.icns</code> (macOS) and
+      <code>.ico</code> (Windows) at all required sizes, plus a 1024px master, and wired into the
+      PyInstaller build. The squircle here is a CSS approximation of Apple's superellipse.</p>
+    <p>Tell me which direction (or a blend), and I'll produce the real icon set and bundle it.</p>
+  </footer>
+</div>
+
+</body>
+</html>

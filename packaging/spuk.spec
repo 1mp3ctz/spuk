@@ -9,11 +9,17 @@
 # from macOS. This spec is shared; the output differs per platform.
 
 import os
+import sys
 
 from PyInstaller.utils.hooks import collect_all, collect_submodules
 
 # SPECPATH is the directory holding this spec (packaging/); ROOT is the repo root.
 ROOT = os.path.abspath(os.path.join(SPECPATH, ".."))
+
+# App icon: .ico drives the Windows .exe, .icns drives the macOS .app bundle.
+ICNS = os.path.join(ROOT, "packaging", "spuk.icns")
+ICO = os.path.join(ROOT, "packaging", "spuk.ico")
+EXE_ICON = ICO if sys.platform == "win32" else ICNS
 
 datas, binaries, hiddenimports = [], [], []
 for pkg in ("ctranslate2", "faster_whisper", "av", "tokenizers", "pystray", "PIL"):
@@ -66,6 +72,7 @@ exe = EXE(
     name="Spuk",
     console=False,          # no terminal window; it's a tray app
     disable_windowed_traceback=False,
+    icon=EXE_ICON,
 )
 coll = COLLECT(exe, a.binaries, a.datas, name="Spuk")
 
@@ -73,10 +80,11 @@ coll = COLLECT(exe, a.binaries, a.datas, name="Spuk")
 app = BUNDLE(
     coll,
     name="Spuk.app",
+    icon=ICNS,
     bundle_identifier="dev.1mp3ctz.spuk",
     info_plist={
         "LSUIElement": True,  # background/menu-bar app, no Dock icon
         "NSMicrophoneUsageDescription": "Spuk transcribes your speech locally.",
-        "CFBundleShortVersionString": "0.3.2",
+        "CFBundleShortVersionString": "0.3.3",
     },
 )
