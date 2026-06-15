@@ -11,6 +11,7 @@ import logging
 
 from .config import load_config
 from .core import SpukCore
+from .permissions import ensure_accessibility
 
 
 def main() -> None:
@@ -27,6 +28,13 @@ def main() -> None:
         format="%(asctime)s  %(message)s",
         datefmt="%H:%M:%S",
     )
+    # Quiet noisy third-party loggers so Spuk's own output is readable.
+    for noisy in ("httpx", "httpcore", "huggingface_hub", "urllib3", "filelock"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
+
+    # Trigger the macOS Accessibility prompt early (and register the app in
+    # System Settings). The hotkey/paste won't work until this is granted.
+    ensure_accessibility(prompt=True)
 
     config = load_config()
     core = SpukCore(config)
