@@ -23,14 +23,16 @@ from PySide6.QtCore import (
     QTimer,
     Signal,
 )
-from PySide6.QtGui import QColor, QFont
+from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
     QFrame,
     QHBoxLayout,
     QLabel,
+    QMenu,
     QPushButton,
+    QSystemTrayIcon,
     QVBoxLayout,
     QWidget,
 )
@@ -271,6 +273,56 @@ def _is_mac() -> bool:
     return platform.system() == "Darwin"
 
 
+def _menubar_icon() -> QIcon:
+    """A tiny purple ghost drawn at runtime (no binary asset to ship)."""
+    size = 22  # macOS menu-bar icons render around this size
+    pm = QPixmap(size, size)
+    pm.fill(Qt.transparent)
+    p = QPainter(pm)
+    p.setRenderHint(QPainter.Antialiasing, True)
+    p.setPen(Qt.NoPen)
+    p.setBrush(QColor(ACCENT))
+    p.drawRoundedRect(1, 1, size - 2, size - 2, 5, 5)
+    p.setBrush(QColor("#ffffff"))
+    p.drawEllipse(6, 4, 10, 10)
+    p.drawRect(6, 9, 10, 8)
+    p.end()
+    return QIcon(pm)
+
+
+def _install_menubar(app, core: SpukCore, listener) -> "QSystemTrayIcon | None":
+    """Add a menu-bar (system-tray) icon whose menu can quit Spuk.
+
+    The floating bar has no window chrome and Spuk runs with no Dock icon, so this
+    is the user's only way to quit. Returns the icon (kept alive by `app`) or None
+    if the platform has no system tray.
+    """
+    if not QSystemTrayIcon.isSystemTrayAvailable():
+        return None
+
+    menu = QMenu()
+    header = menu.addAction("Spuk")
+    header.setEnabled(False)
+    menu.addSeparator()
+    quit_action = menu.addAction("Quit Spuk")
+
+    def _quit() -> None:
+        # Stop the background hotkey listener so the process actually exits.
+        try:
+            if listener is not None:
+                listener.stop()
+        finally:
+            app.quit()
+
+    quit_action.triggered.connect(_quit)
+
+    tray = QSystemTrayIcon(_menubar_icon(), app)
+    tray.setToolTip("Spuk")
+    tray.setContextMenu(menu)
+    tray.show()
+    return tray
+
+
 def run_bar(config: Config, core: SpukCore) -> None:
     app = QApplication.instance() or QApplication([])
     app.setQuitOnLastWindowClosed(False)
@@ -279,7 +331,11 @@ def run_bar(config: Config, core: SpukCore) -> None:
     bar.show()
 
     # Start the global hotkey listener on a background thread.
-    core.make_listener().start()
+    listener = core.make_listener().start()
+
+    # Menu-bar icon with a Quit item (the only way out of this chrome-less app).
+    # Held by the QApplication so it isn't garbage-collected.
+    app._spuk_tray = _install_menubar(app, core, listener)  # type: ignore[attr-defined]
 
     # Warm the model off the UI thread so the bar appears immediately.
     def _warm() -> None:

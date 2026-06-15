@@ -11,7 +11,7 @@ import logging
 
 from .config import load_config
 from .core import SpukCore
-from .permissions import ensure_accessibility
+from .permissions import ensure_permissions
 
 
 def main() -> None:
@@ -37,9 +37,11 @@ def main() -> None:
     for noisy in ("httpx", "httpcore", "huggingface_hub", "urllib3", "filelock"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
 
-    # Trigger the macOS Accessibility prompt early (and register the app in
-    # System Settings). The hotkey/paste won't work until this is granted.
-    ensure_accessibility(prompt=True)
+    # Check the macOS hotkey/paste permissions early. This is silent when already
+    # granted (no nagging popup), and only raises the system prompt when trust is
+    # actually missing. We keep running either way so the UI still appears; the
+    # hotkey simply won't fire until the user grants both perms and relaunches.
+    ensure_permissions(prompt=True)
 
     config = load_config()
     core = SpukCore(config)
