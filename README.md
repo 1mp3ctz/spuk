@@ -152,6 +152,8 @@ show **getting ready / warming up**. **Internet needed once.** After that, Spuk 
 - **The hover bar:** move your mouse over the little pill at the bottom of the screen.
   It expands to show **language buttons, hold-to-talk, your microphone choice, and the
   shortcuts**.
+- **Quit Spuk:** click the little **ghost icon in the menu bar** (top-right of the
+  screen on Mac, system tray on Windows) and choose **Quit Spuk**.
 
 ---
 
@@ -164,12 +166,32 @@ pill is small and sits at the bottom-center.
 
 **I hold the keys and talk, but no text appears.**
 - **Mac:** the most common cause is a missing permission. Re-check **System Settings →
-  Privacy & Security** and make sure **Spuk** is ON for **Accessibility** *and*
-  **Input Monitoring** *and* **Microphone**. Quit and reopen Spuk after changing these.
+  Privacy & Security** and make sure **Spuk** is ON for all three:
+  - **Input Monitoring** — this is the one people miss; without it Spuk never *hears*
+    the hold-to-talk keys, so nothing happens at all.
+  - **Accessibility** — needed to paste the text once it's transcribed.
+  - **Microphone** — needed to hear your voice.
+- **You must fully quit and reopen Spuk after changing any of these.** macOS only
+  applies a permission grant to a *freshly started* program — re-clicking the popup
+  or leaving Spuk running does nothing. Quit it from the **menu-bar ghost icon →
+  Quit Spuk**, then open it again.
 - **Windows:** check the microphone permission (see install step 3). Make sure your
   cursor is actually clicked into a text box.
 - Hold the keys for a **full second or two** while speaking — very short taps are
   ignored on purpose.
+
+**Mac: I installed a new version and now the hotkey is dead, even though Spuk still
+shows as ON in the permission lists.**
+A rebuilt/updated Spuk is a *different* program to macOS, so the old "ON" switch is
+pointing at the previous copy and no longer counts. Clear the stale entries and
+re-grant fresh:
+1. Open **Terminal** and run:
+   ```
+   tccutil reset Accessibility dev.1mp3ctz.spuk
+   tccutil reset ListenEvent  dev.1mp3ctz.spuk
+   ```
+2. Open Spuk again and approve the **Accessibility** and **Input Monitoring** prompts.
+3. Quit Spuk (menu-bar ghost → **Quit Spuk**) and reopen it once more.
 
 **The microphone isn't picking up my voice.**
 Hover the pill and check the **microphone picker** — the wrong input device (e.g. a

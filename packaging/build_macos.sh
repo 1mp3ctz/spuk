@@ -5,10 +5,22 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+# On exFAT/non-HFS volumes macOS scatters AppleDouble "._*" sidecar files through
+# the tree. PyInstaller's own --clean chokes trying to remove them, and they later
+# break codesigning, so we clean the build dirs ourselves (deleting ._* first) and
+# run PyInstaller WITHOUT --clean.
+echo "==> Cleaning previous build artifacts…"
+find build dist -name '._*' -delete 2>/dev/null || true
+rm -rf build dist
+
 echo "==> Building Spuk.app with PyInstaller (Python 3.11 env)…"
 UV_LINK_MODE=copy uv run --with pyinstaller pyinstaller \
-    --clean --noconfirm --workpath build/pyi --distpath dist \
+    --noconfirm --workpath build/pyi --distpath dist \
     packaging/spuk.spec
+
+# Purge AppleDouble junk PyInstaller may have copied in, so codesign won't fail.
+echo "==> Stripping AppleDouble sidecar files from the bundle…"
+find dist/Spuk.app -name '._*' -delete 2>/dev/null || true
 
 echo
 echo "==> Done: dist/Spuk.app"
