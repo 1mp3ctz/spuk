@@ -85,18 +85,8 @@ class SpukBar(QWidget):
 
         self._card = QFrame(self)
         self._card.setObjectName("card")
-        self._card.setStyleSheet(
-            "#card { background-color: rgba(24,24,28,235); border-radius: 18px; }"
-            "QLabel { color: #f4f4f5; }"
-            "QComboBox { color: #f4f4f5; background:#2a2a31; border:1px solid #3a3a42;"
-            " border-radius:8px; padding:3px 8px; }"
-            f"QPushButton#dictate {{ color:#fff; background:{ACCENT}; border:none;"
-            " border-radius:10px; padding:8px; font-weight:600; }"
-            "QPushButton#dictate:pressed { background:#7c3aed; }"
-            "QPushButton.lang { color:#cfcfd4; background:#2a2a31; border:1px solid #3a3a42;"
-            " border-radius:8px; padding:4px 10px; }"
-            "QPushButton.lang:checked { color:#fff; background:" + ACCENT + "; border:none; }"
-        )
+        # Start fully rounded (capsule / "tic-tac"): radius = half the pill height.
+        self._card.setStyleSheet(self._card_qss(COLLAPSED[1] // 2))
         outer.addWidget(self._card)
 
         card = QVBoxLayout(self._card)
@@ -160,6 +150,21 @@ class SpukBar(QWidget):
         self._collapse_timer.setSingleShot(True)
         self._collapse_timer.setInterval(280)
         self._collapse_timer.timeout.connect(self._maybe_collapse)
+
+    @staticmethod
+    def _card_qss(radius: int) -> str:
+        return (
+            f"#card {{ background-color: rgba(24,24,28,235); border-radius: {radius}px; }}"
+            "QLabel { color: #f4f4f5; }"
+            "QComboBox { color: #f4f4f5; background:#2a2a31; border:1px solid #3a3a42;"
+            " border-radius:8px; padding:3px 8px; }"
+            f"QPushButton#dictate {{ color:#fff; background:{ACCENT}; border:none;"
+            " border-radius:10px; padding:8px; font-weight:600; }"
+            "QPushButton#dictate:pressed { background:#7c3aed; }"
+            "QPushButton.lang { color:#cfcfd4; background:#2a2a31; border:1px solid #3a3a42;"
+            " border-radius:8px; padding:4px 10px; }"
+            "QPushButton.lang:checked { color:#fff; background:" + ACCENT + "; border:none; }"
+        )
 
     def _populate_mics(self) -> None:
         self._mic.addItem("System default", None)
@@ -232,6 +237,7 @@ class SpukBar(QWidget):
         self._collapse_timer.stop()
         if not self._expanded:
             self._expanded = True
+            self._card.setStyleSheet(self._card_qss(18))  # softer rounding when open
             for w in self._expanded_widgets:
                 w.show()
             for b in self._lang_buttons.values():
@@ -251,6 +257,7 @@ class SpukBar(QWidget):
             return
         if self._expanded:
             self._expanded = False
+            self._card.setStyleSheet(self._card_qss(COLLAPSED[1] // 2))  # back to capsule
             for w in self._expanded_widgets:
                 w.hide()
             for b in self._lang_buttons.values():
