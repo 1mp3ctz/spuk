@@ -262,4 +262,16 @@ hotkeys, push-to-talk vs toggle.
   Everything after that is offline and free.
 - Accuracy depends on your microphone and how clearly you speak. The default model
   (`small`) is a good balance of speed and accuracy on ordinary computers.
-- **Private/personal**, for the author and family. Not for redistribution.
+
+---
+
+## 📄 License
+
+Spuk's own code is **open source under the [MIT License](LICENSE)** — you're free to
+use, copy, modify, share, and even sell it, as long as the copyright notice stays.
+
+Spuk bundles other open-source libraries (Whisper/CTranslate2, Qt/PySide6, and
+others). They keep their own licenses — see **[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)**.
+A few are LGPL (Qt, pynput, FFmpeg); that's fully fine while Spuk stays open source.
+If you later want to ship a *closed-source* commercial version, read the LGPL note in
+that file first.
