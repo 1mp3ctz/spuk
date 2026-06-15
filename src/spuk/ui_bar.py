@@ -12,6 +12,8 @@ through Qt signals (queued automatically across threads).
 
 from __future__ import annotations
 
+import logging
+import os
 import threading
 
 from PySide6.QtCore import (
@@ -367,12 +369,21 @@ def run_bar(config: Config, core: SpukCore) -> None:
     listener = core.make_listener().start()
 
     def quit_app() -> None:
-        # Stop the background hotkey listener so the process actually exits.
+        # Fully terminate Spuk from either the pill's ⚙ → Quit or the menu bar.
+        #
+        # A plain app.quit() isn't enough: the pynput hotkey listener runs a
+        # native run-loop on a background thread that keeps the process — and the
+        # already-drawn floating pill — alive after Qt's event loop ends. So we
+        # stop the listener, end the Qt loop, and then hard-exit to guarantee the
+        # whole app (pill included) actually goes away on both macOS and Windows.
         try:
             if listener is not None:
                 listener.stop()
-        finally:
-            app.quit()
+        except Exception:  # noqa: BLE001 — never let a teardown error block quit
+            pass
+        app.quit()
+        logging.shutdown()
+        os._exit(0)
 
     window.set_quit(quit_app)
 
