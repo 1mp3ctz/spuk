@@ -236,3 +236,10 @@ others). They keep their own licenses — see **[THIRD_PARTY_NOTICES.md](THIRD_P
 A few are LGPL (Qt, pynput, FFmpeg); that's fully fine while Spuk stays open source.
 If you later want to ship a *closed-source* commercial version, read the LGPL note in
 that file first.
+
+---
+
+Spuk is an independent, personal open-source project. It is **not affiliated with,
+endorsed by, or sponsored by** any other dictation or voice-software company. All
+product names and trademarks mentioned anywhere are the property of their respective
+owners.

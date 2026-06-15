@@ -1,7 +1,7 @@
 [project]
 name = "spuk"
 version = "0.3.0"
-description = "Private, local, free dictation for macOS (Apple Silicon) — a stripped-down Wispr Flow clone."
+description = "Private, local, free press-to-talk dictation for macOS and Windows."
 readme = "README.md"
 requires-python = ">=3.11,<3.13"   # 3.13/3.14 lack reliable ctranslate2 wheels in mid-2026
 dependencies = [

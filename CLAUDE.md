@@ -5,7 +5,7 @@ rules — this is the short version.
 
 ## What Spuk is
 
-Private, **local, free** dictation (Wispr Flow clone) for **macOS and Windows**.
+Private, **local, free** press-to-talk dictation for **macOS and Windows**.
 Hotkey → mic → local Whisper (faster-whisper) → paste into the focused field.
 Languages: English (default), German, Polish — switchable live. Runs as a
 cross-platform tray app; built for the author and family.
