@@ -16,8 +16,8 @@ beam_size        = 1                 # greedy = lowest latency. Raise to 5 for a
 # push_to_talk: hold to record, release to transcribe+paste (recommended default).
 # toggle: press once to start, press again to stop.
 mode        = "push_to_talk"
-key         = "<ctrl>+<alt>+<space>"   # works on macOS and Windows. pynput syntax (special keys in <>).
-cycle_language = "<ctrl>+<alt>+l"      # quickly cycle English -> German -> Polish
+key         = "<ctrl>+<alt>"           # Ctrl+Option on macOS, Strg+Alt on Windows (Option == Alt). Hold both to talk.
+cycle_language = "<ctrl>+<shift>+l"    # cycle English -> German -> Polish (kept off Ctrl+Alt to avoid triggering record)
 
 [audio]
 samplerate  = 16000                # Whisper's native rate — capture here to avoid resampling
