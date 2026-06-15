@@ -8,6 +8,13 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
+
+# Spuk's promise is that nothing leaves your computer. The only network touch is
+# the one-time Whisper model download, and huggingface_hub otherwise sends an
+# anonymous telemetry ping — disable it so the "fully local" guarantee is literal.
+# setdefault keeps it overridable for anyone who wants the default HF behaviour.
+os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
 
 from .config import load_config
 from .core import SpukCore
