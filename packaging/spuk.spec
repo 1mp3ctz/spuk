@@ -8,7 +8,12 @@
 # NOTE: must be built ON each target OS — you cannot cross-build a Windows .exe
 # from macOS. This spec is shared; the output differs per platform.
 
+import os
+
 from PyInstaller.utils.hooks import collect_all, collect_submodules
+
+# SPECPATH is the directory holding this spec (packaging/); ROOT is the repo root.
+ROOT = os.path.abspath(os.path.join(SPECPATH, ".."))
 
 datas, binaries, hiddenimports = [], [], []
 for pkg in ("ctranslate2", "faster_whisper", "av", "tokenizers", "pystray", "PIL"):
@@ -20,19 +25,37 @@ for pkg in ("ctranslate2", "faster_whisper", "av", "tokenizers", "pystray", "PIL
 hiddenimports += collect_submodules("pynput")
 
 # Ship a default, user-editable config beside the app.
-datas += [("../config.toml", ".")]
+datas += [(os.path.join(ROOT, "config.toml"), ".")]
 
 block_cipher = None
 
 a = Analysis(
-    ["../src/spuk/__main__.py"],
-    pathex=["../src"],
+    [os.path.join(ROOT, "packaging", "spuk_launch.py")],
+    pathex=[os.path.join(ROOT, "src")],
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
     runtime_hooks=[],
-    excludes=[],
+    # Spuk uses only QtWidgets. Excluding the heavy unused Qt modules cuts the
+    # bundle size dramatically and removes the QML/VirtualKeyboard frameworks
+    # that carry the FinderInfo metadata which breaks codesigning.
+    excludes=[
+        "PySide6.QtQml", "PySide6.QtQuick", "PySide6.QtQuickWidgets",
+        "PySide6.QtQuick3D", "PySide6.QtQuickControls2", "PySide6.QtQmlModels",
+        "PySide6.QtQmlMeta", "PySide6.QtVirtualKeyboard",
+        "PySide6.Qt3DCore", "PySide6.Qt3DRender", "PySide6.Qt3DInput",
+        "PySide6.Qt3DAnimation", "PySide6.Qt3DExtras",
+        "PySide6.QtMultimedia", "PySide6.QtMultimediaWidgets",
+        "PySide6.QtWebEngineCore", "PySide6.QtWebEngineWidgets",
+        "PySide6.QtWebEngineQuick", "PySide6.QtWebChannel",
+        "PySide6.QtPdf", "PySide6.QtPdfWidgets", "PySide6.QtCharts",
+        "PySide6.QtDataVisualization", "PySide6.QtSensors",
+        "PySide6.QtPositioning", "PySide6.QtLocation", "PySide6.QtSql",
+        "PySide6.QtTest", "PySide6.QtDesigner", "PySide6.QtBluetooth",
+        "PySide6.QtNfc", "PySide6.QtSerialPort", "PySide6.QtWebSockets",
+        "PySide6.QtScxml", "PySide6.QtSpatialAudio", "PySide6.QtTextToSpeech",
+    ],
     cipher=block_cipher,
 )
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
