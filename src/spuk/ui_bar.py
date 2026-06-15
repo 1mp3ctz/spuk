@@ -20,6 +20,7 @@ from PySide6.QtCore import (
     QPropertyAnimation,
     QRect,
     Qt,
+    QTimer,
     Signal,
 )
 from PySide6.QtGui import QColor, QFont
@@ -39,9 +40,9 @@ from .core import SpukCore
 
 LANGUAGE_NAMES = {"en": "English", "de": "Deutsch", "pl": "Polski"}
 
-COLLAPSED = (150, 44)
-EXPANDED = (380, 188)
-BOTTOM_MARGIN = 64
+COLLAPSED = (64, 22)
+EXPANDED = (300, 168)
+BOTTOM_MARGIN = 56
 ACCENT = "#8b5cf6"
 
 
@@ -65,6 +66,12 @@ class SpukBar(QWidget):
             Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
         )
         self.setAttribute(Qt.WA_TranslucentBackground, True)
+        # Don't steal focus from the user's text field when the bar appears.
+        self.setAttribute(Qt.WA_ShowWithoutActivating, True)
+        # Keep the Tool window visible even when another app is frontmost (macOS).
+        always_show = getattr(Qt, "WA_MacAlwaysShowToolWindow", None)
+        if always_show is not None:
+            self.setAttribute(always_show, True)
 
         self._build_ui()
         self._wire_core()
@@ -93,17 +100,18 @@ class SpukBar(QWidget):
         outer.addWidget(self._card)
 
         card = QVBoxLayout(self._card)
-        card.setContentsMargins(14, 10, 14, 12)
-        card.setSpacing(8)
+        card.setContentsMargins(10, 3, 10, 5)
+        card.setSpacing(6)
 
-        # Collapsed/header row: status dot + language code + hint.
+        # Collapsed/header row: status dot + language code (+ status when expanded).
         header = QHBoxLayout()
+        header.setSpacing(6)
         self._dot = QLabel("●")
-        self._dot.setStyleSheet("color:#6b7280; font-size:14px;")
+        self._dot.setStyleSheet("color:#6b7280; font-size:11px;")
         self._lang_code = QLabel(self._core.language.upper())
-        self._lang_code.setFont(QFont("", 13, QFont.Bold))
+        self._lang_code.setFont(QFont("", 11, QFont.Bold))
         self._status = QLabel("starting…")
-        self._status.setStyleSheet("color:#9ca3af;")
+        self._status.setStyleSheet("color:#9ca3af; font-size:11px;")
         header.addWidget(self._dot)
         header.addWidget(self._lang_code)
         header.addStretch(1)
@@ -139,11 +147,19 @@ class SpukBar(QWidget):
         self._hint.setStyleSheet("color:#9ca3af; font-size:11px;")
         card.addWidget(self._hint)
 
-        self._expanded_widgets = [self._dictate, self._mic, self._hint]
+        # Status text only shows when expanded so the collapsed pill stays tiny.
+        self._expanded_widgets = [self._status, self._dictate, self._mic, self._hint]
         for w in self._expanded_widgets:
             w.hide()
         for b in self._lang_buttons.values():
             b.hide()
+
+        # Delayed, popup-aware collapse so opening the mic dropdown doesn't
+        # collapse the bar out from under it.
+        self._collapse_timer = QTimer(self)
+        self._collapse_timer.setSingleShot(True)
+        self._collapse_timer.setInterval(280)
+        self._collapse_timer.timeout.connect(self._maybe_collapse)
 
     def _populate_mics(self) -> None:
         self._mic.addItem("System default", None)
@@ -182,7 +198,14 @@ class SpukBar(QWidget):
         threading.Thread(target=self._core.finish_recording, daemon=True).start()
 
     def _mic_changed(self, _index: int) -> None:
-        self._core.set_input_device(self._mic.currentData())
+        # A bad device selection must never crash the app.
+        try:
+            self._core.set_input_device(self._mic.currentData())
+        except Exception as exc:  # noqa: BLE001
+            self._status.setText("mic unavailable")
+            import logging
+
+            logging.getLogger("spuk.ui").warning("Could not set microphone: %s", exc)
 
     # --- hover expand / collapse ----------------------------------------
 
@@ -206,6 +229,7 @@ class SpukBar(QWidget):
         self._anim = anim  # keep a reference so it isn't GC'd
 
     def enterEvent(self, event) -> None:  # noqa: N802 (Qt naming)
+        self._collapse_timer.stop()
         if not self._expanded:
             self._expanded = True
             for w in self._expanded_widgets:
@@ -216,6 +240,15 @@ class SpukBar(QWidget):
         super().enterEvent(event)
 
     def leaveEvent(self, event) -> None:  # noqa: N802
+        # Defer collapse briefly; cancelled if the cursor returns or a popup is open.
+        self._collapse_timer.start()
+        super().leaveEvent(event)
+
+    def _maybe_collapse(self) -> None:
+        # Don't collapse while the mic dropdown is open or the cursor is back on us.
+        if self._mic.view().isVisible() or self.underMouse():
+            self._collapse_timer.start()
+            return
         if self._expanded:
             self._expanded = False
             for w in self._expanded_widgets:
@@ -223,7 +256,6 @@ class SpukBar(QWidget):
             for b in self._lang_buttons.values():
                 b.hide()
             self._animate(expanded=False)
-        super().leaveEvent(event)
 
 
 def _is_mac() -> bool:
