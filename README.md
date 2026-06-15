@@ -7,7 +7,8 @@ were typing in (an email, a message, a document, anywhere).
 No subscription. No internet needed after setup. Your voice never leaves your
 computer. It's free, forever.
 
-Works on **Mac** and **Windows**, in **English, German, and Polish**.
+Works on **Mac** and **Windows**, in **almost any language** — the built-in speech
+model understands around 100, so you can dictate in whatever you speak.
 
 ---
 
@@ -15,7 +16,7 @@ Works on **Mac** and **Windows**, in **English, German, and Polish**.
 
 - 🆓 **Free** — no account, no subscription, no hidden costs.
 - 🔒 **Private** — everything happens on your own computer. Nothing is uploaded.
-- 🌍 **Three languages** — English, German (with ä ö ü ß), Polish (with ą ę ł ó ż) — switch any time.
+- 🌍 **Almost any language** — around 100 supported (English, German, Polish, Spanish, French, Ukrainian, and many more). Add the ones you speak and switch any time; accents and special characters (ä ö ü ß, ą ę ł ó ż, …) just work.
 - 🎤 **Just hold a key and talk** — no buttons to find, no windows to open.
 - 💻 **Mac and Windows** — same app, your choice.
 
@@ -146,12 +147,15 @@ show **getting ready / warming up**. **Internet needed once.** After that, Spuk 
 
 - **Dictate:** click into any text field, **hold the hotkey, speak, release.**
   - Mac: **`Control` + `Option`** · Windows: **`Strg` + `Alt`**
-- **Switch language:** press **`Ctrl` + `Shift` + `L`** to cycle
-  **English → German → Polish**. (You can also pick a language from the hover bar.)
-  The current language shows on the pill.
+- **Switch language:** press **`Ctrl` + `Shift` + `L`** to cycle through the languages
+  you've added, or pick one from the hover bar. The current language shows on the pill.
+- **Add a language:** click the **⚙ gear** on the pill (or the menu-bar ghost →
+  **Settings…**) to open Settings, then use **"Add a language…"** to pick from the
+  ~100 the speech model supports. Your chosen languages appear as quick-switch buttons
+  on the pill, and your picks are remembered between restarts.
 - **The hover bar:** move your mouse over the little pill at the bottom of the screen.
-  It expands to show **language buttons, hold-to-talk, your microphone choice, and the
-  shortcuts**.
+  It expands to show **your languages, hold-to-talk, and the shortcuts**, plus the
+  **⚙ gear** for Settings (languages & microphone).
 - **Quit Spuk:** click the little **ghost icon in the menu bar** (top-right of the
   screen on Mac, system tray on Windows) and choose **Quit Spuk**.
 
@@ -194,8 +198,9 @@ re-grant fresh:
 3. Quit Spuk (menu-bar ghost → **Quit Spuk**) and reopen it once more.
 
 **The microphone isn't picking up my voice.**
-Hover the pill and check the **microphone picker** — the wrong input device (e.g. a
-disconnected headset) may be selected. Pick your real microphone.
+Open **Settings** (the **⚙ gear** on the pill, or the menu-bar ghost → **Settings…**)
+and check the **Microphone** picker — the wrong input device (e.g. a disconnected
+headset) may be selected. Pick your real microphone.
 
 **Mac says "Spuk is damaged and can't be opened."**
 It's not damaged — this is the unsigned-app warning in disguise. The simple fix:
