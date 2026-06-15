@@ -52,6 +52,8 @@ class SpukWindow(QWidget):
     # Emitted from the background update-check thread with an updates.UpdateResult,
     # so the dialog is shown back on the Qt main thread.
     _update_done = Signal(object)
+    # Emitted when a self-update finishes staging: (ok, error_message).
+    _self_update_done = Signal(bool, str)
 
     def __init__(self, config: Config, core: SpukCore, signals: CoreSignals) -> None:
         super().__init__()
@@ -177,6 +179,7 @@ class SpukWindow(QWidget):
         c.addLayout(footer)
 
         self._update_done.connect(self._show_update_result)
+        self._self_update_done.connect(self._on_self_update_done)
         self.setStyleSheet(_QSS)
 
     def _populate_mics(self) -> None:
@@ -275,19 +278,70 @@ class SpukWindow(QWidget):
         self._update_btn.setEnabled(True)
         self._update_btn.setText("Check for updates")
 
-        if result.status == "available":
-            box = QMessageBox(self)
-            box.setWindowTitle("Update available")
-            box.setText(result.message)
+        if result.status == "current":
+            QMessageBox.information(self, "Spuk", result.message)
+            return
+        if result.status != "available":
+            QMessageBox.warning(self, "Check for updates", result.message)
+            return
+
+        box = QMessageBox(self)
+        box.setWindowTitle("Update available")
+        box.setText(result.message)
+
+        # In the installed app we can download + replace + relaunch in one click.
+        # Running from source (or an unsupported platform) → open the page instead.
+        if updates.can_self_update() and result.asset_url:
+            box.setInformativeText("Install it now? Spuk will download it and restart automatically.")
+            install = box.addButton("Update now", QMessageBox.AcceptRole)
+            box.addButton("Open page", QMessageBox.ActionRole)
+            box.addButton("Later", QMessageBox.RejectRole)
+            box.setDefaultButton(install)
+            box.exec()
+            clicked = box.clickedButton()
+            if clicked is install:
+                self._start_self_update(result.asset_url)
+            elif clicked is not None and box.buttonRole(clicked) == QMessageBox.ActionRole:
+                webbrowser.open(result.url)
+        else:
             box.setInformativeText("Open the download page in your browser?")
             box.setStandardButtons(QMessageBox.Open | QMessageBox.Cancel)
             box.setDefaultButton(QMessageBox.Open)
             if box.exec() == QMessageBox.Open:
                 webbrowser.open(result.url)
-        elif result.status == "current":
-            QMessageBox.information(self, "Spuk", result.message)
-        else:
-            QMessageBox.warning(self, "Check for updates", result.message)
+
+    def _start_self_update(self, asset_url: str) -> None:
+        """Download the new build and stage the in-place swap (off the UI thread)."""
+        self._update_btn.setEnabled(False)
+        self._update_btn.setText("Updating…")
+
+        def worker() -> None:
+            try:
+                updates.self_update(asset_url)
+                self._self_update_done.emit(True, "")
+            except Exception as exc:  # noqa: BLE001
+                log.warning("Self-update failed: %s", exc)
+                self._self_update_done.emit(False, str(exc))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_self_update_done(self, ok: bool, message: str) -> None:
+        if ok:
+            # The detached helper is waiting for us to exit; quitting triggers the
+            # swap + relaunch.
+            if self._quit is not None:
+                self._quit()
+            return
+        self._update_btn.setEnabled(True)
+        self._update_btn.setText("Check for updates")
+        box = QMessageBox(self)
+        box.setWindowTitle("Update failed")
+        box.setText("Couldn't install the update automatically.")
+        box.setInformativeText("Open the download page to update manually?")
+        box.setStandardButtons(QMessageBox.Open | QMessageBox.Cancel)
+        box.setDefaultButton(QMessageBox.Open)
+        if box.exec() == QMessageBox.Open:
+            webbrowser.open(updates.RELEASES_PAGE)
 
     def present(self) -> None:
         self.show()

@@ -160,8 +160,10 @@ show **getting ready / warming up**. **Internet needed once.** After that, Spuk 
   It expands to show **your languages, hold-to-talk, and the shortcuts**, plus the
   **⚙ gear** for Settings (languages & microphone).
 - **Check for updates:** open **Settings** (⚙ gear or menu-bar ghost → **Settings…**)
-  and click **"Check for updates"**. If a newer version exists, Spuk offers to open the
-  download page so you can grab the latest build.
+  and click **"Check for updates"**. If a newer version exists, the installed app can
+  **download and install it for you in one click** — it replaces itself and restarts
+  automatically, no re-downloading by hand. (When you run Spuk from source it just opens
+  the download page instead.)
 - **Quit Spuk:** click the little **ghost icon in the menu bar** (top-right of the
   screen on Mac, system tray on Windows) and choose **Quit Spuk** — or use **Quit Spuk**
   in Settings. Either fully closes the app (pill included).

@@ -29,5 +29,24 @@ class IsNewer(unittest.TestCase):
         self.assertFalse(updates.is_newer("v0.3.0", "0.3.1"))
 
 
+class AssetForPlatform(unittest.TestCase):
+    ASSETS = [
+        {"name": "Spuk-macos.zip", "browser_download_url": "https://x/mac.zip"},
+        {"name": "Spuk-windows.zip", "browser_download_url": "https://x/win.zip"},
+    ]
+
+    def test_picks_macos(self):
+        self.assertEqual(updates._asset_for_platform(self.ASSETS, "darwin"), "https://x/mac.zip")
+
+    def test_picks_windows(self):
+        self.assertEqual(updates._asset_for_platform(self.ASSETS, "win32"), "https://x/win.zip")
+
+    def test_unsupported_platform(self):
+        self.assertIsNone(updates._asset_for_platform(self.ASSETS, "linux"))
+
+    def test_missing_asset(self):
+        self.assertIsNone(updates._asset_for_platform([], "darwin"))
+
+
 if __name__ == "__main__":
     unittest.main()
