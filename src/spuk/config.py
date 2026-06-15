@@ -75,6 +75,30 @@ class Config:
     post_process: PostProcessConfig
 
 
+def _overlay_user_languages(t: dict) -> None:
+    """Overlay the user's saved language choices onto the transcribe defaults.
+
+    Mutates ``t`` in place. Keeps only known Whisper codes, and guarantees the
+    active language is one of the available ones.
+    """
+    from .languages import is_supported
+    from .settings_store import load_user_settings
+
+    user = load_user_settings()
+
+    chosen = user.get("languages")
+    if isinstance(chosen, list):
+        valid = tuple(c for c in chosen if isinstance(c, str) and is_supported(c))
+        if valid:
+            t["languages"] = valid
+
+    default = user.get("default_language")
+    if isinstance(default, str) and default in t["languages"]:
+        t["default_language"] = default
+    elif t.get("default_language") not in t.get("languages", ()):  # keep it consistent
+        t["default_language"] = t["languages"][0] if t["languages"] else t.get("default_language")
+
+
 def load_config(path: Path | None = None) -> Config:
     """Load and validate the TOML config. Raises with a clear message on error."""
     cfg_path = path or DEFAULT_CONFIG_PATH
@@ -87,6 +111,7 @@ def load_config(path: Path | None = None) -> Config:
     try:
         t = dict(raw["transcribe"])
         t["languages"] = tuple(t.get("languages", []))  # list -> immutable tuple
+        _overlay_user_languages(t)
         transcribe = TranscribeConfig(**t)
         hotkey = HotkeyConfig(**raw["hotkey"])
         audio = AudioConfig(**raw["audio"])
