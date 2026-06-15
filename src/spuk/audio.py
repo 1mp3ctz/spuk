@@ -24,6 +24,8 @@ class Recorder:
         self._cfg = cfg
         self._frames: list[np.ndarray] = []
         self._stream: sd.InputStream | None = None
+        # None = system default input. A sounddevice index or name selects a mic.
+        self.device: int | str | None = None
 
     def start(self) -> None:
         if self._stream is not None:
@@ -41,6 +43,7 @@ class Recorder:
                 samplerate=self._cfg.samplerate,
                 channels=self._cfg.channels,
                 dtype="float32",
+                device=self.device,
                 callback=callback,
             )
             self._stream.start()

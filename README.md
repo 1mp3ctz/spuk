@@ -27,7 +27,9 @@ Windows** from one codebase.
 UV_LINK_MODE=copy uv venv --python 3.11 .venv
 UV_LINK_MODE=copy uv sync
 uv run python scripts/check_env.py     # verify imports, mic, clipboard
-uv run python -m spuk                   # tray app  (--headless for terminal only)
+uv run python -m spuk                   # floating bar (Wispr-Flow style)
+#   --tray      menu-bar/system-tray icon instead of the bar
+#   --headless  no UI, terminal only (good for debugging)
 ```
 
 ```powershell

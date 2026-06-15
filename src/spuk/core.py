@@ -34,8 +34,11 @@ class SpukCore:
         self._post = build_post_processor(config.post_process)
 
         self._language = config.transcribe.default_language
-        # Optional observer so a UI (tray) can react to language changes.
+        # Optional observers so a UI can react. These fire from the hotkey
+        # listener thread — a Qt UI must marshal them onto the main thread.
         self.on_language_change: Callable[[str], None] | None = None
+        self.on_recording_change: Callable[[bool], None] | None = None
+        self.on_transcript: Callable[[str], None] | None = None
 
     # --- language state ---------------------------------------------------
 
@@ -55,6 +58,11 @@ class SpukCore:
         log.info("Language → %s", lang)
         if self.on_language_change:
             self.on_language_change(lang)
+
+    def set_input_device(self, device: int | str | None) -> None:
+        """Choose the microphone (sounddevice index or name; None = system default)."""
+        self._recorder.device = device
+        log.info("Microphone → %s", device if device is not None else "system default")
 
     def cycle_language(self) -> None:
         langs = self._cfg.transcribe.languages
@@ -89,17 +97,31 @@ class SpukCore:
         except KeyboardInterrupt:
             log.info("Shutting down.")
 
+    # --- recording (used by the hotkey and the UI button) -----------------
+
+    def begin_recording(self) -> None:
+        """Public entry to start recording (UI button or hotkey)."""
+        self._on_start()
+
+    def finish_recording(self) -> None:
+        """Public entry to stop + transcribe + paste. Blocks ~1s — call off the UI thread."""
+        self._on_stop()
+
     # --- hotkey callbacks -------------------------------------------------
 
     def _on_start(self) -> None:
         try:
             self._recorder.start()
             log.info("● recording… (%s)", self._language)
+            if self.on_recording_change:
+                self.on_recording_change(True)
         except Exception:
             log.error("Recording failed to start — check microphone permission.")
 
     def _on_stop(self) -> None:
         audio = self._recorder.stop()
+        if self.on_recording_change:
+            self.on_recording_change(False)
         duration = len(audio) / self._cfg.audio.samplerate if len(audio) else 0.0
         if duration < self._cfg.audio.min_seconds:
             log.info("… too short (%.2fs) — ignoring.", duration)
@@ -121,3 +143,5 @@ class SpukCore:
         text = self._post.process(text)
         log.info("→ (%.2fs) %s", elapsed, text)
         paste_text(text)
+        if self.on_transcript:
+            self.on_transcript(text)
