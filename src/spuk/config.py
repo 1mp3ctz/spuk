@@ -50,6 +50,11 @@ class HotkeyConfig:
     mode: str  # "push_to_talk" | "toggle"
     key: str
     cycle_language: str
+    # Hands-free (push_to_talk only): double-tap the hotkey to start recording
+    # without holding it, then press once more to stop + transcribe. Defaulted so
+    # an older config.toml (without these keys) still loads.
+    handsfree: bool = True
+    double_tap_seconds: float = 0.4  # max gap/length of a tap; also the tap-vs-hold cutoff
 
 
 @dataclass(frozen=True)

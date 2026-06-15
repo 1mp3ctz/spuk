@@ -16,21 +16,24 @@ Shares one CoreSignals bus with the pill, so both stay in sync.
 from __future__ import annotations
 
 import logging
+import threading
+import webbrowser
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QComboBox,
     QCompleter,
     QFrame,
     QHBoxLayout,
     QLabel,
+    QMessageBox,
     QPushButton,
     QScrollArea,
     QVBoxLayout,
     QWidget,
 )
 
-from . import __version__
+from . import __version__, updates
 from .config import Config
 from .core import SpukCore
 from .languages import all_languages
@@ -45,6 +48,10 @@ WARM_DOT = "#fde68a"
 
 class SpukWindow(QWidget):
     """The Settings window. Closing hides it; the app keeps running via the pill."""
+
+    # Emitted from the background update-check thread with an updates.UpdateResult,
+    # so the dialog is shown back on the Qt main thread.
+    _update_done = Signal(object)
 
     def __init__(self, config: Config, core: SpukCore, signals: CoreSignals) -> None:
         super().__init__()
@@ -152,17 +159,24 @@ class SpukWindow(QWidget):
         c.addWidget(priv)
 
         footer = QHBoxLayout()
+        footer.setSpacing(8)
         ver = QLabel(f"v{__version__}")
         ver.setObjectName("ver")
+        self._update_btn = QPushButton("Check for updates")
+        self._update_btn.setObjectName("update")
+        self._update_btn.setCursor(Qt.PointingHandCursor)
+        self._update_btn.clicked.connect(self._on_check_updates)
         quit_btn = QPushButton("Quit Spuk")
         quit_btn.setObjectName("quit")
         quit_btn.setCursor(Qt.PointingHandCursor)
         quit_btn.clicked.connect(self._on_quit)
         footer.addWidget(ver)
         footer.addStretch(1)
+        footer.addWidget(self._update_btn)
         footer.addWidget(quit_btn)
         c.addLayout(footer)
 
+        self._update_done.connect(self._show_update_result)
         self.setStyleSheet(_QSS)
 
     def _populate_mics(self) -> None:
@@ -244,6 +258,37 @@ class SpukWindow(QWidget):
         if self._quit is not None:
             self._quit()
 
+    # --- updates ---------------------------------------------------------
+
+    def _on_check_updates(self) -> None:
+        """Check GitHub for a newer release (off the UI thread so it can't hang)."""
+        self._update_btn.setEnabled(False)
+        self._update_btn.setText("Checking…")
+
+        def worker() -> None:
+            result = updates.check_for_update(__version__)
+            self._update_done.emit(result)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _show_update_result(self, result: "updates.UpdateResult") -> None:
+        self._update_btn.setEnabled(True)
+        self._update_btn.setText("Check for updates")
+
+        if result.status == "available":
+            box = QMessageBox(self)
+            box.setWindowTitle("Update available")
+            box.setText(result.message)
+            box.setInformativeText("Open the download page in your browser?")
+            box.setStandardButtons(QMessageBox.Open | QMessageBox.Cancel)
+            box.setDefaultButton(QMessageBox.Open)
+            if box.exec() == QMessageBox.Open:
+                webbrowser.open(result.url)
+        elif result.status == "current":
+            QMessageBox.information(self, "Spuk", result.message)
+        else:
+            QMessageBox.warning(self, "Check for updates", result.message)
+
     def present(self) -> None:
         self.show()
         self.raise_()
@@ -324,6 +369,14 @@ QComboBox#add QAbstractItemView, QComboBox#mic QAbstractItemView {
 }
 #priv { color: rgba(255, 255, 255, 0.82); font-size: 12px; }
 #ver { color: rgba(255, 255, 255, 0.6); font-size: 11px; }
+QPushButton#update {
+    color: #ffffff; font-size: 13px; font-weight: 600;
+    background: rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(255, 255, 255, 0.30);
+    border-radius: 9px; padding: 7px 14px;
+}
+QPushButton#update:hover { background: rgba(255, 255, 255, 0.28); }
+QPushButton#update:disabled { color: rgba(255, 255, 255, 0.6); background: rgba(255, 255, 255, 0.08); }
 QPushButton#quit {
     color: #ffffff; font-size: 13px; font-weight: 600;
     background: rgba(255, 255, 255, 0.14);

@@ -145,8 +145,11 @@ show **getting ready / warming up**. **Internet needed once.** After that, Spuk 
 
 ## 🎛️ How to use it
 
-- **Dictate:** click into any text field, **hold the hotkey, speak, release.**
+- **Dictate (hold):** click into any text field, **hold the hotkey, speak, release.**
   - Mac: **`Control` + `Option`** · Windows: **`Strg` + `Alt`**
+- **Dictate hands-free (no holding):** **double-tap** the hotkey to start recording,
+  let go and talk as long as you like, then **press it once more** to stop and drop
+  the text in. Great for longer dictation when you don't want to hold the keys down.
 - **Switch language:** press **`Ctrl` + `Shift` + `L`** to cycle through the languages
   you've added, or pick one from the hover bar. The current language shows on the pill.
 - **Add a language:** click the **⚙ gear** on the pill (or the menu-bar ghost →
@@ -156,8 +159,12 @@ show **getting ready / warming up**. **Internet needed once.** After that, Spuk 
 - **The hover bar:** move your mouse over the little pill at the bottom of the screen.
   It expands to show **your languages, hold-to-talk, and the shortcuts**, plus the
   **⚙ gear** for Settings (languages & microphone).
+- **Check for updates:** open **Settings** (⚙ gear or menu-bar ghost → **Settings…**)
+  and click **"Check for updates"**. If a newer version exists, Spuk offers to open the
+  download page so you can grab the latest build.
 - **Quit Spuk:** click the little **ghost icon in the menu bar** (top-right of the
-  screen on Mac, system tray on Windows) and choose **Quit Spuk**.
+  screen on Mac, system tray on Windows) and choose **Quit Spuk** — or use **Quit Spuk**
+  in Settings. Either fully closes the app (pill included).
 
 ---
 

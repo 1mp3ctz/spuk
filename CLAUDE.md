@@ -37,12 +37,14 @@ src/spuk/
   config.py        load + validate config
   audio.py         mic capture (sounddevice)
   transcriber.py   swappable Whisper engine (faster-whisper now)
-  hotkey.py        global push-to-talk / toggle (pynput)
+  hotkey.py        global hotkey FSM: hold (push-to-talk), double-tap hands-free, toggle (pynput)
   paste.py         clipboard save → set → Cmd+V → restore
   postprocess.py   optional, OFF-by-default text cleanup (gated)
   core.py          SpukCore engine + runtime language state (UI-agnostic)
-  tray.py          cross-platform system-tray UI (pystray)
-  __main__.py      entry point (tray by default, --headless for terminal)
+  updates.py       manual "Check for updates" — compares the GitHub release tag (user-triggered only)
+  ui_bar.py        floating pill UI (PySide6); ui_window.py = Settings window
+  tray.py          alternate system-tray UI (pystray; --tray)
+  __main__.py      entry point (floating pill by default, --tray / --headless)
 scripts/check_env.py     Phase 0 sanity check
 packaging/               PyInstaller spec + build_macos.sh / build_windows.ps1
 docs/                    ARCHITECTURE.md, PLAN.md

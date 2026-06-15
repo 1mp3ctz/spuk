@@ -18,6 +18,8 @@ beam_size        = 1                 # greedy = lowest latency. Raise to 5 for a
 mode        = "push_to_talk"
 key         = "<ctrl>+<alt>"           # Ctrl+Option on macOS, Strg+Alt on Windows (Option == Alt). Hold both to talk.
 cycle_language = "<ctrl>+<shift>+l"    # cycle English -> German -> Polish (kept off Ctrl+Alt to avoid triggering record)
+handsfree          = true              # double-tap the hotkey to record hands-free; press once more to stop + transcribe
+double_tap_seconds = 0.4               # how quick the double-tap must be (also the tap-vs-hold cutoff)
 
 [audio]
 samplerate  = 16000                # Whisper's native rate — capture here to avoid resampling
