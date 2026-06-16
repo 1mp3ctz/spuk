@@ -276,7 +276,8 @@ class SpukWindow(QWidget):
         self._paste.setMinimumHeight(40)
         self._paste.addItem("Paste with: Default (Ctrl+V / Cmd+V)", "")
         self._paste.addItem("Paste with: Terminal (Ctrl+Shift+V)", "<ctrl>+<shift>+v")
-        self._paste.setCurrentIndex(1 if hk.paste_key else 0)
+        self._paste.addItem("Paste with: Type it out (any app, incl. old terminals)", "type")
+        self._paste.setCurrentIndex(self._paste_index_for(hk.paste_key))
         self._paste.currentIndexChanged.connect(self._paste_changed)
         v.addWidget(self._paste)
 
@@ -359,6 +360,13 @@ class SpukWindow(QWidget):
     def _handsfree_changed(self, _state: int) -> None:
         self._core.rebind_hotkeys(handsfree=self._handsfree.isChecked())
 
+    def _paste_index_for(self, value: str) -> int:
+        """Dropdown index whose data matches the saved paste_key ("", a combo, or "type")."""
+        for i in range(self._paste.count()):
+            if self._paste.itemData(i) == (value or ""):
+                return i
+        return 0
+
     def _paste_changed(self, _i: int) -> None:
         self._core.set_paste_shortcut(self._paste.currentData())
 
@@ -380,7 +388,7 @@ class SpukWindow(QWidget):
         self._handsfree.setEnabled(hk.mode == "push_to_talk")
         self._handsfree.blockSignals(False)
         self._paste.blockSignals(True)
-        self._paste.setCurrentIndex(1 if hk.paste_key else 0)
+        self._paste.setCurrentIndex(self._paste_index_for(hk.paste_key))
         self._paste.blockSignals(False)
 
     # --- core wiring -----------------------------------------------------
