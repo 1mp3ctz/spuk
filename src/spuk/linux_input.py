@@ -387,6 +387,31 @@ def build_linux_paste_injector(combo: str = "<ctrl>+v") -> Callable[[], None]:
     return _unavailable
 
 
+def build_linux_typer() -> Callable[[str], None] | None:
+    """A typer that injects Unicode text via the ydotool CLI, or None if absent.
+
+    ydotool's ``type`` synthesizes the characters through ``/dev/uinput`` (works on
+    X11 and Wayland). Unlike Windows/macOS there's no clean layout-independent
+    Unicode-injection API at the uinput level, so we lean on ydotool; when it isn't
+    installed we return None and the caller falls back to clipboard paste (Linux
+    terminals accept Ctrl+Shift+V, so there's no console paste gap to work around).
+    """
+    ydotool = shutil.which("ydotool")
+    if not ydotool:
+        return None
+
+    def typer(text: str) -> None:
+        subprocess.run(
+            [ydotool, "type", text],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
+    log.info("Linux type-out: using ydotool CLI (%s).", ydotool)
+    return typer
+
+
 # --- clipboard tooling hint ------------------------------------------------
 
 
