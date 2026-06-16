@@ -63,7 +63,7 @@ class SpukWindow(QWidget):
         self._core = core
         self._quit = None  # set by run_bar
         self.setWindowTitle("Spuk — Settings")
-        self.setFixedSize(400, 720)
+        self.setFixedSize(400, 770)
         self._build_ui()
         self._wire(signals)
 
@@ -84,7 +84,7 @@ class SpukWindow(QWidget):
         scene_l.addWidget(card)
         c = QVBoxLayout(card)
         c.setContentsMargins(20, 18, 20, 18)
-        c.setSpacing(12)
+        c.setSpacing(10)
 
         # Header: ghost + title + live status pill.
         top = QHBoxLayout()
@@ -122,7 +122,7 @@ class SpukWindow(QWidget):
         scroll.setFrameShape(QFrame.NoFrame)
         scroll.setWidgetResizable(True)
         scroll.setWidget(holder)
-        scroll.setFixedHeight(150)
+        scroll.setFixedHeight(130)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         scroll.viewport().setStyleSheet("background: transparent;")
         c.addWidget(scroll)
@@ -246,6 +246,7 @@ class SpukWindow(QWidget):
         # Hold-to-talk vs press-to-toggle.
         self._mode = QComboBox()
         self._mode.setObjectName("mic")  # reuse the combo styling
+        self._mode.setMinimumHeight(40)  # don't let the layout compress it (text clips)
         self._mode.addItem("Hold to talk", "push_to_talk")
         self._mode.addItem("Press to toggle", "toggle")
         self._mode.setCurrentIndex(0 if hk.mode == "push_to_talk" else 1)
@@ -547,7 +548,7 @@ QComboBox#add, QComboBox#mic {
     color: #ffffff; font-size: 13px;
     background: rgba(255, 255, 255, 0.12);
     border: 1px solid rgba(255, 255, 255, 0.25);
-    border-radius: 11px; padding: 10px 14px;
+    border-radius: 11px; padding: 10px 14px; min-height: 18px;
 }
 QComboBox#add QLineEdit, QComboBox#mic QLineEdit {
     color: #ffffff; background: transparent; border: none;

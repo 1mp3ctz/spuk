@@ -62,7 +62,10 @@ def combo_to_label(combo: str) -> str:
         if t in _LABELS:
             out.append(_LABELS[t])
         elif t.startswith("<") and t.endswith(">"):
-            out.append(t[1:-1].upper())  # <f8> -> F8
+            name = t[1:-1]
+            # Word keys read nicer title-cased (space -> Space); keep alnum keys
+            # upper (f8 -> F8).
+            out.append(name.capitalize() if name.isalpha() and len(name) > 1 else name.upper())
         else:
             out.append(t.upper())  # l -> L
     return " + ".join(out)
