@@ -1,3 +1,3 @@
-"""Spuk — a private, local, free dictation tool for macOS (Apple Silicon)."""
+"""Spuk — a private, local, free dictation tool for macOS, Windows, and Linux."""
 
-__version__ = "0.3.5"
+__version__ = "1.0.0"
