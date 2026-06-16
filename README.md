@@ -33,6 +33,24 @@ Go to the **[Releases page](https://github.com/1mp3ctz/spuk/releases)** and open
 the newest release at the top. Under **"Assets"** you'll see the downloads. Pick
 the one for your computer below and follow the steps.
 
+### 🔐 Permissions at a glance
+
+Spuk needs to **hear a global hotkey**, **read your microphone**, and **type the
+text** into whatever app you're in. How you allow that differs by platform:
+
+| Platform | What you grant | Where | Re-do after an update? |
+|----------|----------------|-------|------------------------|
+| 🍎 **macOS** | **Microphone** + **Accessibility** + **Input Monitoring** (three toggles) | System Settings → Privacy & Security | **Yes** — see the note below |
+| 🪟 **Windows** | Nothing app-specific. Just make sure the **global** microphone switch is on | Settings → Privacy & security → Microphone | No |
+| 🐧 **Linux** | Add your user to the **`input`** group + install a clipboard tool | one-time terminal command | No |
+
+> 🍎 **macOS re-asks after every update.** Because Spuk isn't signed with a paid
+> Apple certificate, macOS treats each new version as a "different" app and
+> **forgets the three permissions on every update** — you'll re-grant them once
+> after each new version. Windows and Linux do **not** have this; you set them up
+> once and updates keep working. (Details in step 3 below and
+> [Troubleshooting](#-troubleshooting).)
+
 ---
 
 ### 🍎 On a Mac
@@ -74,6 +92,10 @@ in each of these:
 > If you don't see Spuk in one of these lists, try Spuk once (hold the keys and
 > talk) and it will appear so you can switch it on. You may need to quit and reopen
 > Spuk after granting these.
+>
+> 🔁 **After every update you'll re-grant these three** — macOS forgets them when
+> the app changes (because Spuk isn't paid-signed). It's the same quick toggles,
+> just once per new version. This is macOS-only; Windows and Linux keep working.
 
 #### 4. Wait about a minute the very first time ⏳
 
