@@ -141,9 +141,59 @@ jobs:
           if-no-files-found: error
 
   # ---------------------------------------------------------------------------
+  build-linux:
+    name: Build Linux (.deb / .rpm / tarball)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install build tooling (fpm + rpm + compiler for evdev)
+        # fpm (Ruby) builds the .deb/.rpm; rpm provides rpmbuild so the .rpm is
+        # emitted; build-essential + linux-libc-dev let the Linux-only `evdev`
+        # dependency compile during `uv sync` (it needs <linux/input.h>).
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ruby ruby-dev build-essential rpm linux-libc-dev
+          sudo gem install --no-document fpm
+
+      - name: Create Python 3.11 environment
+        run: uv venv --python 3.11 .venv
+
+      - name: Install dependencies (includes Linux-only evdev)
+        run: uv sync
+
+      - name: Build Linux packages (.deb / .rpm / tarball)
+        # build_linux.sh runs PyInstaller (via `uv run --with pyinstaller`) then
+        # fpm. PyInstaller is not a cross-compiler, so this is the ONLY place the
+        # real Linux bundle + packages get built.
+        run: bash packaging/build_linux.sh
+
+      - name: Sanity check artifacts exist
+        run: |
+          test -n "$(ls dist/*.deb 2>/dev/null)"     || { echo 'no .deb produced';     exit 1; }
+          test -n "$(ls dist/*.rpm 2>/dev/null)"     || { echo 'no .rpm produced';     exit 1; }
+          test -n "$(ls dist/*.tar.gz 2>/dev/null)"  || { echo 'no tarball produced';  exit 1; }
+          echo 'Linux artifacts:'; du -sh dist/*.deb dist/*.rpm dist/*.tar.gz
+
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Spuk-linux
+          path: |
+            dist/*.deb
+            dist/*.rpm
+            dist/*.tar.gz
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
   release:
     name: Publish GitHub Release
-    needs: [build-macos, build-windows]
+    needs: [build-macos, build-windows, build-linux]
     runs-on: ubuntu-latest
     # Only publish a Release when triggered by a tag. A manual (workflow_dispatch)
     # run still builds + uploads artifacts above, but won't create a Release.
@@ -161,6 +211,12 @@ jobs:
           name: Spuk-windows
           path: dist-windows
 
+      - name: Download Linux artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Spuk-linux
+          path: dist-linux
+
       - name: Create / update the GitHub Release and attach binaries
         uses: softprops/action-gh-release@v2
         with:
@@ -170,12 +226,19 @@ jobs:
             dist-macos/Spuk-macos.dmg
             dist-macos/Spuk-macos.zip
             dist-windows/Spuk-windows.zip
+            dist-linux/*.deb
+            dist-linux/*.rpm
+            dist-linux/*.tar.gz
           body: |
             ## Spuk — download below 👻
 
             - **Mac:** `Spuk-macos.dmg` — open it and **drag Spuk into Applications**.
               *(`Spuk-macos.zip` is also here for the in-app updater and power users.)*
             - **Windows:** `Spuk-windows.zip` — extract and run `Spuk.exe`.
+            - **Linux:** `spuk_*_amd64.deb` (Debian/Ubuntu/Mint) or `spuk-*.x86_64.rpm`
+              (Fedora/openSUSE) — install with `sudo apt install ./spuk_*.deb` /
+              `sudo dnf install ./spuk-*.rpm`. A portable `.tar.gz` (run `sudo ./install.sh`)
+              is there for any other distro; Arch users see the AUR `PKGBUILD` in the repo.
 
             See the [README install guide](https://github.com/1mp3ctz/spuk#%EF%B8%8F-download--install)
             for the simple, step-by-step setup.
@@ -184,3 +247,8 @@ jobs:
             > time. Windows: **More info → Run anyway** the first time. The first launch
             > downloads the speech model (~480 MB) and needs internet once; offline and
             > free after that.
+            >
+            > 🐧 **Linux one-time setup:** add yourself to the `input` group so the hotkey
+            > and paste work — `sudo usermod -aG input "$USER"`, then log out and back in.
+            > Install a clipboard helper (`wl-clipboard` on Wayland, `xclip` on X11); the
+            > `.deb` pulls one in automatically. Works on both X11 and Wayland.

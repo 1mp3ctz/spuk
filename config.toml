@@ -16,7 +16,8 @@ beam_size        = 1                 # greedy = lowest latency. Raise to 5 for a
 # push_to_talk: hold to record, release to transcribe+paste (recommended default).
 # toggle: press once to start, press again to stop.
 mode        = "push_to_talk"
-key         = "<ctrl>+<alt>"           # Ctrl+Option on macOS, Strg+Alt on Windows (Option == Alt). Hold both to talk.
+key         = "<ctrl>+<alt>"           # Ctrl+Option (macOS), Strg+Alt (Windows), Ctrl+Alt (Linux). Hold both to talk.
+# Linux: the hotkey is read via evdev (needs the 'input' group) and works on both X11 and Wayland.
 cycle_language = "<ctrl>+<shift>+l"    # cycle English -> German -> Polish (kept off Ctrl+Alt to avoid triggering record)
 handsfree          = true              # double-tap the hotkey to record hands-free; press once more to stop + transcribe
 double_tap_seconds = 0.4               # how quick the double-tap must be (also the tap-vs-hold cutoff)
