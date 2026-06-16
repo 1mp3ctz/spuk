@@ -55,6 +55,10 @@ class HotkeyConfig:
     # an older config.toml (without these keys) still loads.
     handsfree: bool = True
     double_tap_seconds: float = 0.4  # max gap/length of a tap; also the tap-vs-hold cutoff
+    # Shortcut Spuk SENDS to paste the transcript. "" = the OS default (Cmd+V on
+    # macOS, Ctrl+V elsewhere). Set to "<ctrl>+<shift>+v" for terminals (VS Code /
+    # Cursor), where plain Ctrl+V isn't "paste".
+    paste_key: str = ""
 
 
 @dataclass(frozen=True)
@@ -129,6 +133,10 @@ def _overlay_user_hotkey(h: dict) -> None:
     handsfree = user.get("hotkey_handsfree")
     if isinstance(handsfree, bool):
         h["handsfree"] = handsfree
+
+    paste = user.get("paste_key")
+    if isinstance(paste, str):
+        h["paste_key"] = paste
 
 
 def load_config(path: Path | None = None) -> Config:

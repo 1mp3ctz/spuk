@@ -28,3 +28,11 @@ def test_hotkey_settings_maps_only_changed_fields():
     out = hotkey_settings(mode="toggle", handsfree=False)
     assert out == {"hotkey_mode": "toggle", "hotkey_handsfree": False}
     assert hotkey_settings() == {}
+
+
+def test_with_hotkey_and_settings_handle_paste_key():
+    hk = _hk()
+    new = with_hotkey(hk, paste_key="<ctrl>+<shift>+v")
+    assert new.paste_key == "<ctrl>+<shift>+v"
+    assert hk.paste_key == ""  # default, original unchanged
+    assert hotkey_settings(paste_key="<ctrl>+<shift>+v") == {"paste_key": "<ctrl>+<shift>+v"}
