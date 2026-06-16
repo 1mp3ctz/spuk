@@ -293,6 +293,13 @@ pill is small and sits at the bottom-center.
 - Hold the keys for a **full second or two** while speaking — very short taps are
   ignored on purpose.
 
+**Windows: dictation works everywhere except the old `cmd.exe` console window.**
+The classic console has no paste shortcut (paste is right-click only), so Spuk can't
+paste into it. Open **Settings → Hotkeys → "Paste with:"** and choose **"Type it
+out"** — Spuk will type the text in directly, which works in `cmd.exe` and any other
+app. (Modern terminals like Windows Terminal or VS Code / Cursor just need
+**"Terminal (Ctrl+Shift+V)"** instead.)
+
 **Mac: I installed a new version and now the hotkey is dead, even though Spuk still
 shows as ON in the permission lists.**
 A rebuilt/updated Spuk is a *different* program to macOS, so the old "ON" switch is
