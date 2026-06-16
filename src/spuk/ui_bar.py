@@ -40,6 +40,7 @@ from PySide6.QtWidgets import (
 
 from .config import Config
 from .core import SpukCore
+from .hotkey_format import combo_to_label
 from .languages import display_name
 
 # Native display names for the three first-class languages; anything else falls
@@ -142,8 +143,7 @@ class SpukBar(QWidget):
         self._rebuild_langs()
         card.addLayout(self._lang_row)
 
-        mod = "⌃⌥" if _is_mac() else "Ctrl+Alt"
-        self._hint = QLabel(f"Hold {mod} to dictate · ⚙ for languages & settings")
+        self._hint = QLabel(self._hint_text())
         self._hint.setStyleSheet("color:rgba(255,255,255,0.8); font-size:11px;")
         card.addWidget(self._hint)
 
@@ -214,6 +214,7 @@ class SpukBar(QWidget):
         self._sig.language.connect(self._on_language)
         self._sig.languages.connect(lambda _codes: self._rebuild_langs())
         self._sig.ready.connect(lambda: self._status.setText("ready"))
+        self._sig.hotkey_changed.connect(self._on_hotkey_changed)
 
     def _on_recording(self, active: bool) -> None:
         self._dot.setStyleSheet(
@@ -225,6 +226,13 @@ class SpukBar(QWidget):
         self._lang_code.setText(lang.upper())
         for code, b in self._lang_buttons.items():
             b.setChecked(code == lang)
+
+    def _hint_text(self) -> str:
+        verb = "Hold" if self._core.hotkey.mode == "push_to_talk" else "Press"
+        return f"{verb} {combo_to_label(self._core.hotkey.key)} to dictate · ⚙ for settings"
+
+    def _on_hotkey_changed(self) -> None:
+        self._hint.setText(self._hint_text())
 
     def _dictate_released(self) -> None:
         # Transcribe+paste blocks ~1s — keep it off the UI thread.
