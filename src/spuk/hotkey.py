@@ -167,6 +167,35 @@ class HotkeyListener:
         if on_done and combo:
             on_done(combo)
 
+    # --- live re-binding -------------------------------------------------
+
+    def update_bindings(self, *, key_combo, mode, taps, handsfree, double_tap_seconds) -> None:
+        """Re-point what the listener matches, in place — NO listener restart.
+
+        Tearing down and recreating the pynput CGEventTap (or the evdev reader
+        threads) to apply a new hotkey crashes on macOS. Instead the running
+        listener keeps feeding key edges and we just swap the combos it matches
+        against. Each field is reassigned to a fresh object (atomic in CPython)
+        and transient chord/tap state is reset, so the new binding starts clean
+        even though this is called from the UI thread while the listener thread
+        may be reading.
+        """
+        self._expected = set(keyboard.HotKey.parse(key_combo))
+        self._mode = mode
+        self._handsfree = handsfree and mode == "push_to_talk"
+        self._double = double_tap_seconds
+        self._taps = [
+            {"keys": set(keyboard.HotKey.parse(combo)), "cb": cb, "fired": False}
+            for combo, cb in (taps or {}).items()
+        ]
+        self._pressed = set()
+        self._chord_down = False
+        self._recording = False
+        self._latched = False
+        self._toggle_on = False
+        self._pending_double = False
+        self._ignore_release = False
+
     # --- pynput plumbing -------------------------------------------------
 
     def _canonical(self, key):
