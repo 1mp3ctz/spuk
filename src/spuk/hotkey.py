@@ -75,11 +75,14 @@ class HotkeyListener:
         self._pending_double = False    # current press completes a double-tap
         self._ignore_release = False    # swallow the release that stopped hands-free
 
-    # --- pynput plumbing -------------------------------------------------
-
-    def _canonical(self, key):
-        assert self._listener is not None
-        return self._listener.canonical(key)
+    # --- backend-agnostic key feed ---------------------------------------
+    #
+    # `_feed_press` / `_feed_release` take an ALREADY-CANONICAL key (a
+    # `pynput.keyboard.Key`/`KeyCode`, matching what `keyboard.HotKey.parse`
+    # produces) and drive the chord/tap state. Both the pynput path
+    # (`_on_press`/`_on_release`, which canonicalise via the listener) and the
+    # Linux evdev path (which canonicalises via keycode→Key mapping) call these,
+    # so the FSM stays the single source of truth — no duplicated chord logic.
 
     def _satisfied(self, expected: set) -> bool:
         return expected.issubset(self._pressed)
@@ -96,19 +99,33 @@ class HotkeyListener:
             if not self._satisfied(tap["keys"]):
                 tap["fired"] = False
 
-    def _on_press(self, key) -> None:
-        self._pressed.add(self._canonical(key))
+    def _feed_press(self, key) -> None:
+        """Register a canonical key going down and advance the chord/tap state."""
+        self._pressed.add(key)
         self._fire_taps()
         if self._satisfied(self._expected) and not self._chord_down:
             self._chord_down = True
             self._chord_edge(down=True, t=time.monotonic())
 
-    def _on_release(self, key) -> None:
-        self._pressed.discard(self._canonical(key))
+    def _feed_release(self, key) -> None:
+        """Register a canonical key going up and advance the chord/tap state."""
+        self._pressed.discard(key)
         self._rearm_taps()
         if self._chord_down and not self._satisfied(self._expected):
             self._chord_down = False
             self._chord_edge(down=False, t=time.monotonic())
+
+    # --- pynput plumbing -------------------------------------------------
+
+    def _canonical(self, key):
+        assert self._listener is not None
+        return self._listener.canonical(key)
+
+    def _on_press(self, key) -> None:
+        self._feed_press(self._canonical(key))
+
+    def _on_release(self, key) -> None:
+        self._feed_release(self._canonical(key))
 
     # --- the actual behaviour (driven purely by chord up/down edges) -----
 

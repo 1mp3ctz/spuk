@@ -365,8 +365,9 @@ def run_bar(config: Config, core: SpukCore) -> None:
     window = SpukWindow(config, core, signals)
     bar.set_open_window(window.present)
 
-    # Start the global hotkey listener on a background thread.
-    listener = core.make_listener().start()
+    # Start the global hotkey backend on a background thread (pynput on
+    # macOS/Windows, evdev on Linux; both return a handle with .stop()).
+    listener = core.make_input_backend().start()
 
     def quit_app() -> None:
         # Fully terminate Spuk from either the pill's ⚙ → Quit or the menu bar.
