@@ -64,6 +64,8 @@ class CoreSignals(QObject):
     languages = Signal(tuple)  # the curated set changed (add/remove)
     transcript = Signal(str)
     ready = Signal()
+    combo_captured = Signal(str)   # a Settings hotkey capture finished
+    hotkey_changed = Signal()      # bindings changed -> refresh labels
 
 
 class SpukBar(QWidget):
@@ -353,6 +355,8 @@ def run_bar(config: Config, core: SpukCore) -> None:
     core.on_language_change = signals.language.emit
     core.on_languages_change = signals.languages.emit
     core.on_transcript = signals.transcript.emit
+    core.on_combo_captured = signals.combo_captured.emit
+    core.on_hotkey_change = signals.hotkey_changed.emit
 
     # The floating pill is the primary, always-on UI.
     bar = SpukBar(config, core, signals)
@@ -365,9 +369,10 @@ def run_bar(config: Config, core: SpukCore) -> None:
     window = SpukWindow(config, core, signals)
     bar.set_open_window(window.present)
 
-    # Start the global hotkey backend on a background thread (pynput on
-    # macOS/Windows, evdev on Linux; both return a handle with .stop()).
-    listener = core.make_input_backend().start()
+    # Start the global hotkey backend. Core owns the handle (pynput on
+    # macOS/Windows, evdev on Linux) so it can swap it live when the user
+    # changes a hotkey in Settings.
+    core.start_input()
 
     def quit_app() -> None:
         # Fully terminate Spuk from either the pill's ⚙ → Quit or the menu bar.
@@ -378,8 +383,7 @@ def run_bar(config: Config, core: SpukCore) -> None:
         # stop the listener, end the Qt loop, and then hard-exit to guarantee the
         # whole app (pill included) actually goes away on both macOS and Windows.
         try:
-            if listener is not None:
-                listener.stop()
+            core.stop_input()
         except Exception:  # noqa: BLE001 — never let a teardown error block quit
             pass
         app.quit()
