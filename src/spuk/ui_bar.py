@@ -383,18 +383,13 @@ def run_bar(config: Config, core: SpukCore) -> None:
     core.start_input()
 
     def quit_app() -> None:
-        # Fully terminate Spuk from either the pill's ⚙ → Quit or the menu bar.
+        # Hard-exit immediately. os._exit terminates the whole process — including
+        # the pynput listener thread that otherwise keeps the pill alive after
+        # Qt's event loop ends (which is why a plain app.quit() isn't enough).
         #
-        # A plain app.quit() isn't enough: the pynput hotkey listener runs a
-        # native run-loop on a background thread that keeps the process — and the
-        # already-drawn floating pill — alive after Qt's event loop ends. So we
-        # stop the listener, end the Qt loop, and then hard-exit to guarantee the
-        # whole app (pill included) actually goes away on both macOS and Windows.
-        try:
-            core.stop_input()
-        except Exception:  # noqa: BLE001 — never let a teardown error block quit
-            pass
-        app.quit()
+        # We deliberately do NOT stop the listener first: tearing down the macOS
+        # CGEventTap on the way out traps (SIGTRAP → "Python quit unexpectedly").
+        # os._exit reclaims the thread regardless, so stopping it is unnecessary.
         logging.shutdown()
         os._exit(0)
 
