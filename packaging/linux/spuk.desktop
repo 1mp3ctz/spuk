@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Spuk
+GenericName=Dictation
+Comment=Private, local, free push-to-talk dictation (Whisper, on-device)
+Exec=spuk
+Icon=spuk
+Terminal=false
+Categories=Utility;Accessibility;AudioVideo;
+Keywords=dictation;speech;voice;whisper;transcription;
+StartupNotify=false
