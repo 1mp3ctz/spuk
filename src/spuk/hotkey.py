@@ -75,6 +75,12 @@ class HotkeyListener:
         self._pending_double = False    # current press completes a double-tap
         self._ignore_release = False    # swallow the release that stopped hands-free
 
+        # --- combo capture (Settings "press your keys") ------------------
+        self._capturing = False
+        self._capture_on_done: Callable[[str], None] | None = None
+        self._capture_max: set = set()
+        self._capture_down: set = set()
+
     # --- backend-agnostic key feed ---------------------------------------
     #
     # `_feed_press` / `_feed_release` take an ALREADY-CANONICAL key (a
@@ -101,6 +107,9 @@ class HotkeyListener:
 
     def _feed_press(self, key) -> None:
         """Register a canonical key going down and advance the chord/tap state."""
+        if self._capturing:
+            self._capture_press(key)
+            return
         self._pressed.add(key)
         self._fire_taps()
         if self._satisfied(self._expected) and not self._chord_down:
@@ -109,11 +118,54 @@ class HotkeyListener:
 
     def _feed_release(self, key) -> None:
         """Register a canonical key going up and advance the chord/tap state."""
+        if self._capturing:
+            self._capture_release(key)
+            return
         self._pressed.discard(key)
         self._rearm_taps()
         if self._chord_down and not self._satisfied(self._expected):
             self._chord_down = False
             self._chord_edge(down=False, t=time.monotonic())
+
+    # --- combo capture ---------------------------------------------------
+    #
+    # While capturing, key edges feed a collector instead of the chord FSM, so
+    # pressing the combo in Settings *sets* it rather than starting a recording.
+    # This works for every backend because both pynput and evdev funnel through
+    # `_feed_press`/`_feed_release`.
+
+    def begin_capture(self, on_done: Callable[[str], None]) -> None:
+        """Capture the next combo the user presses instead of driving the FSM.
+
+        ``on_done`` is called once, with the canonical combo string, on the first
+        key release. Fires on the listener thread — marshal to the UI thread.
+        """
+        self._capture_on_done = on_done
+        self._capture_max = set()
+        self._capture_down = set()
+        self._capturing = True
+
+    def cancel_capture(self) -> None:
+        self._capturing = False
+        self._capture_on_done = None
+
+    def _capture_press(self, key) -> None:
+        self._capture_down.add(key)
+        # Track the largest simultaneously-held set (so Ctrl+Alt captures both).
+        if len(self._capture_down) >= len(self._capture_max):
+            self._capture_max = set(self._capture_down)
+
+    def _capture_release(self, key) -> None:
+        from .hotkey_format import keys_to_combo_string
+
+        combo = keys_to_combo_string(self._capture_max)
+        on_done = self._capture_on_done
+        self._capturing = False
+        self._capture_on_done = None
+        self._capture_down = set()
+        self._capture_max = set()
+        if on_done and combo:
+            on_done(combo)
 
     # --- pynput plumbing -------------------------------------------------
 
