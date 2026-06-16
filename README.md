@@ -7,8 +7,8 @@ were typing in (an email, a message, a document, anywhere).
 No subscription. No internet needed after setup. Your voice never leaves your
 computer. It's free, forever.
 
-Works on **Mac** and **Windows**, in **almost any language** — the built-in speech
-model understands around 100, so you can dictate in whatever you speak.
+Works on **Mac**, **Windows**, and **Linux**, in **almost any language** — the built-in
+speech model understands around 100, so you can dictate in whatever you speak.
 
 ---
 
@@ -18,7 +18,7 @@ model understands around 100, so you can dictate in whatever you speak.
 - 🔒 **Private** — everything happens on your own computer. Nothing is uploaded.
 - 🌍 **Almost any language** — around 100 supported (English, German, Polish, Spanish, French, Ukrainian, and many more). Add the ones you speak and switch any time; accents and special characters (ä ö ü ß, ą ę ł ó ż, …) just work.
 - 🎤 **Just hold a key and talk** — no buttons to find, no windows to open.
-- 💻 **Mac and Windows** — same app, your choice.
+- 💻 **Mac, Windows, and Linux** — same app, your choice.
 
 There's a small floating pill at the bottom of your screen that shows when Spuk is
 listening. Hover it with your mouse to see the language buttons and shortcuts.
@@ -144,6 +144,49 @@ show **getting ready / warming up**. **Internet needed once.** After that, Spuk 
 
 ---
 
+### 🐧 On Linux
+
+Spuk ships as normal native packages — no AppImage, no Flatpak.
+
+#### 1. Install
+
+Download the file for your distro from the **[Releases page](https://github.com/1mp3ctz/spuk/releases)**, then:
+
+- **Debian / Ubuntu / Mint:** `sudo apt install ./spuk_*_amd64.deb`
+- **Fedora / openSUSE / RHEL:** `sudo dnf install ./spuk-*.x86_64.rpm`
+- **Arch / Manjaro:** build the `PKGBUILD` in `packaging/aur/` with `makepkg -si`.
+- **Any other distro:** grab `spuk-*-linux-x86_64.tar.gz`, extract it, and run `sudo ./install.sh`.
+
+#### 2. One-time setup (important — read this!)
+
+So Spuk can hear your hotkey and type for you, your user must be in the **`input`**
+group. The installer offers to add you, but to be sure, run:
+
+```
+sudo usermod -aG input "$USER"
+```
+
+Then **log out and back in** — group changes only apply to a fresh login.
+
+Spuk also needs a tiny clipboard helper to drop text in. The `.deb`/`.rpm` pull one
+in automatically; on other distros install **`wl-clipboard`** (Wayland) or **`xclip`**
+(X11). Wayland users can optionally add **`ydotool`** for a second paste path.
+
+> ✅ **Works on both X11 and Wayland.** Spuk reads the keyboard at the system level,
+> so the hold-to-talk key works no matter which display server your distro uses.
+
+#### 3. Talk! 🎤
+
+1. Click into any text box.
+2. **Hold `Ctrl` + `Alt`**.
+3. **Speak** while holding them.
+4. **Let go** — your words appear.
+
+The first run downloads the speech model (~480 MB, internet needed once); fully
+offline and free afterwards, exactly like on Mac and Windows.
+
+---
+
 ## 🎛️ How to use it
 
 - **Dictate (hold):** click into any text field, **hold the hotkey, speak, release.**
@@ -238,6 +281,21 @@ key = "<ctrl>+<alt>"          ->   key = "<ctrl>+<alt>+<space>"
 ```
 Save and restart Spuk — now you hold **Strg+Alt+Space** to dictate, and typing
 `@`/`€` is no longer affected.
+
+**Linux: I hold the keys and talk, but nothing happens.**
+Almost always the `input` group. Run `groups` — if `input` isn't listed, run
+`sudo usermod -aG input "$USER"` and then **log out and back in** (a reboot also
+works). Spuk reads the keyboard from `/dev/input`, which needs that group.
+
+**Linux: the text is transcribed (I see it in the log) but doesn't paste.**
+Install a clipboard helper — `wl-clipboard` on Wayland, or `xclip`/`xsel` on X11 —
+so Spuk can set the clipboard. On Wayland, installing `ydotool` (and starting
+`ydotoold`) also gives Spuk a reliable way to send the paste keystroke.
+
+**Linux: "could not load the Qt platform plugin xcb".**
+A system Qt library is missing. On Debian/Ubuntu:
+`sudo apt install libxcb-cursor0 libxkbcommon0 libegl1`. The `.deb`/`.rpm` declare
+these as dependencies, so a normal package install pulls them in for you.
 
 ---
 

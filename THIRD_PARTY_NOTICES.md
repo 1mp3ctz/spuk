@@ -21,11 +21,26 @@ to comply with their attribution and notice requirements.
 | [pyperclip](https://github.com/asweigart/pyperclip) | BSD-3-Clause | clipboard |
 | [PyAV](https://github.com/PyAV-Org/PyAV) | BSD-3-Clause | audio decoding |
 | [FFmpeg](https://ffmpeg.org/) (bundled in PyAV) | **LGPL-2.1+** | media libraries |
-| [pynput](https://github.com/moses-palmer/pynput) | **LGPL-3.0** | global hotkey + key injection |
+| [pynput](https://github.com/moses-palmer/pynput) | **LGPL-3.0** | global hotkey + key injection (macOS / Windows) |
+| [python-evdev](https://github.com/gvalkov/python-evdev) | BSD (Revised) | Linux only: global hotkey via `/dev/input` + paste injection via `uinput` |
 | [pystray](https://github.com/moses-palmer/pystray) | **LGPL-3.0** | system-tray icon (optional `--tray`) |
 | [PySide6 / Qt](https://www.qt.io/) | **LGPL-3.0** (or Qt commercial) | floating-bar UI |
 | [shiboken6](https://wiki.qt.io/Qt_for_Python) | **LGPL-3.0** | PySide6 binding |
 | [Whisper model weights](https://github.com/openai/whisper) (downloaded at first run) | MIT | speech model |
+
+## Optional external tools on Linux (not bundled)
+
+On Linux, Spuk can call a few small command-line tools **if you install them via
+your distribution's package manager**. They are **separate programs, not bundled
+inside any Spuk artifact**, so their licenses do not attach to Spuk's binaries —
+they are listed here only for transparency:
+
+| Tool | License | Used for |
+|------|---------|----------|
+| [wl-clipboard](https://github.com/bugaevc/wl-clipboard) | GPL-3.0-or-later | clipboard on Wayland |
+| [xclip](https://github.com/astrand/xclip) | GPL-2.0-or-later | clipboard on X11 |
+| [xsel](https://github.com/kfish/xsel) | MIT / X11 | clipboard on X11 (alternative) |
+| [ydotool](https://github.com/ReimuNotMoe/ydotool) | AGPL-3.0 | optional paste-keystroke fallback |
 
 ## About the LGPL components (Qt/PySide6, pynput, pystray, FFmpeg)
 

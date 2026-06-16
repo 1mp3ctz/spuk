@@ -1,0 +1,85 @@
+# Maintainer: Viktor Kotowski <viktor.07.kotowski@gmail.com>
+#
+# Arch/Manjaro recipe for Spuk — private, local, free push-to-talk dictation.
+#
+# This repackages the official GitHub release tarball built by
+# packaging/build_linux.sh (the PyInstaller onedir bundle + desktop entry +
+# icons), so AUR users don't need a Python 3.11 / PyInstaller toolchain. It
+# installs the SAME FHS layout as the .deb/.rpm:
+#     /opt/spuk/Spuk, /usr/bin/spuk symlink, desktop entry, hicolor icons.
+#
+# To bump: update pkgver to the new pyproject.toml version, reset pkgrel=1, then
+# refresh the checksum with:   updpkgsums   (or set sha256sums to 'SKIP').
+
+pkgname=spuk
+# pkgver MUST match the 'version' in pyproject.toml for the matching release.
+pkgver=0.3.5
+pkgrel=1
+pkgdesc="Private, local, free push-to-talk dictation (on-device Whisper)"
+arch=('x86_64')
+url="https://github.com/1mp3ctz/spuk"
+license=('MIT')
+
+# Runtime libs the bundled Qt (xcb platform plugin) + PortAudio load at runtime.
+depends=('portaudio' 'libxkbcommon' 'fontconfig' 'mesa' 'xcb-util-cursor')
+
+# Clipboard tool (one needed) + Wayland paste helper are optional at install
+# time but required for full function — declared as optdepends.
+optdepends=('wl-clipboard: clipboard set/paste under Wayland'
+            'xclip: clipboard set/paste under X11'
+            'xsel: alternative X11 clipboard tool'
+            'ydotool: alternative paste injection (Wayland) when /dev/uinput is restricted')
+
+install="${pkgname}.install"
+
+# Repackage the release tarball produced by build_linux.sh.
+source=("${pkgname}-${pkgver}-linux-x86_64.tar.gz::${url}/releases/download/v${pkgver}/${pkgname}-${pkgver}-linux-x86_64.tar.gz")
+# Replace with the real checksum (updpkgsums) before publishing; SKIP lets the
+# recipe build locally against a hand-placed tarball during testing.
+sha256sums=('SKIP')
+
+package() {
+    cd "${srcdir}/${pkgname}-${pkgver}-linux-x86_64"
+
+    # Bundle -> /opt/spuk
+    install -d "${pkgdir}/opt/spuk"
+    cp -a Spuk/. "${pkgdir}/opt/spuk/"
+
+    # Launcher symlink /usr/bin/spuk -> /opt/spuk/Spuk
+    install -d "${pkgdir}/usr/bin"
+    ln -s "/opt/spuk/Spuk" "${pkgdir}/usr/bin/spuk"
+
+    # Desktop entry
+    install -Dm644 share/applications/spuk.desktop \
+        "${pkgdir}/usr/share/applications/spuk.desktop"
+
+    # hicolor icons (all sizes shipped in the tarball)
+    for size in 16 32 48 64 128 256 512; do
+        src="share/icons/hicolor/${size}x${size}/apps/spuk.png"
+        [ -f "${src}" ] || continue
+        install -Dm644 "${src}" \
+            "${pkgdir}/usr/share/icons/hicolor/${size}x${size}/apps/spuk.png"
+    done
+
+    # License text, if present in the tarball; otherwise document where it lives.
+    if [ -f LICENSE ]; then
+        install -Dm644 LICENSE "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+    fi
+}
+
+# --- Alternative: build from source instead of repackaging the tarball ------
+#
+# If you prefer AUR to build the bundle itself, replace source()/package() above
+# with a git checkout + PyInstaller run, e.g.:
+#
+#   makedepends=('python' 'uv')
+#   source=("git+${url}.git#tag=v${pkgver}")
+#   build() {
+#       cd "${srcdir}/spuk"
+#       UV_LINK_MODE=copy uv run --with pyinstaller pyinstaller \
+#           --clean --noconfirm packaging/spuk.spec
+#   }
+#   # then package() copies dist/Spuk + packaging/linux/spuk.desktop + icons.
+#
+# The tarball approach is the default because it matches the .deb/.rpm artifacts
+# and avoids requiring the 3.11 toolchain on every AUR user's machine.

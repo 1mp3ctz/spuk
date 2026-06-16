@@ -1,0 +1,91 @@
+#!/bin/sh
+# Spuk post-install scriptlet (shared by the .deb and .rpm packages).
+#
+# Runs as root after files are unpacked. It MUST be idempotent and MUST NOT fail
+# the install: every step is guarded and always exits 0. It does three things:
+#   1. Refresh the icon cache + desktop database (only if those tools exist).
+#   2. Offer to add the installing user to the 'input' group (needed to read
+#      /dev/input for the hotkey and write /dev/uinput for paste injection).
+#   3. Print a clear one-time setup note (log out/in, Wayland ydotool, clipboard).
+#
+# POSIX sh only (no bashisms): dpkg runs maintainer scripts with /bin/sh, which
+# is dash on Debian/Ubuntu.
+
+set -e
+
+ICON_THEME_DIR="/usr/share/icons/hicolor"
+DESKTOP_DIR="/usr/share/applications"
+
+# --- 1. Refresh caches (best-effort; never fatal) --------------------------
+
+if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+    # -f force, -t allow updating an existing theme, -q quiet. Guarded so a
+    # missing/!writable theme dir can never abort the install.
+    gtk-update-icon-cache -f -t -q "$ICON_THEME_DIR" >/dev/null 2>&1 || true
+fi
+
+if command -v update-desktop-database >/dev/null 2>&1; then
+    update-desktop-database -q "$DESKTOP_DIR" >/dev/null 2>&1 || true
+fi
+
+# --- 2. Add the installing user to the 'input' group ------------------------
+#
+# $SUDO_USER is the human who ran `sudo apt/dnf install ...`. We only touch the
+# group when we can identify a real, non-root user AND the group exists AND they
+# are not already a member (idempotent). usermod failures never abort the install.
+
+ADDED_TO_GROUP=""
+if [ -n "${SUDO_USER:-}" ] && [ "${SUDO_USER}" != "root" ]; then
+    if command -v getent >/dev/null 2>&1 && getent group input >/dev/null 2>&1; then
+        if id -nG "${SUDO_USER}" 2>/dev/null | tr ' ' '\n' | grep -qx "input"; then
+            : # already a member — nothing to do (idempotent)
+        elif command -v usermod >/dev/null 2>&1; then
+            if usermod -aG input "${SUDO_USER}" >/dev/null 2>&1; then
+                ADDED_TO_GROUP="yes"
+            fi
+        fi
+    fi
+fi
+
+# --- 3. One-time setup note -------------------------------------------------
+
+cat <<'EOF'
+
+────────────────────────────────────────────────────────────────────────────
+ Spuk installed.  One-time Linux setup so the hotkey + paste work:
+
+ Spuk reads your keyboard from /dev/input and injects the paste key via
+ /dev/uinput. Both require membership in the 'input' group.
+EOF
+
+if [ -n "${ADDED_TO_GROUP}" ]; then
+    cat <<EOF
+
+   ✓ Added '${SUDO_USER}' to the 'input' group.
+     You MUST log out and back in (group changes only apply to new sessions)
+     before the hotkey will fire.
+EOF
+else
+    cat <<'EOF'
+
+   • Add your user to the 'input' group, then log out and back in:
+       sudo usermod -aG input "$USER"
+EOF
+fi
+
+cat <<'EOF'
+
+ Wayland users: install 'ydotool' (+ start the ydotoold daemon) as an
+   alternative paste path if /dev/uinput is restricted.
+
+ A clipboard tool is required so transcribed text can be set:
+   • Wayland:  wl-clipboard   (provides wl-copy)
+   • X11:      xclip   or   xsel
+
+ Spuk still launches without these; the hotkey just won't fire until the
+ 'input' group membership is active.
+────────────────────────────────────────────────────────────────────────────
+
+EOF
+
+exit 0
