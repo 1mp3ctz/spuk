@@ -1,6 +1,7 @@
 """Version-comparison logic for the update checker (no network)."""
 
 import unittest
+from unittest import mock
 
 from spuk import updates
 
@@ -46,6 +47,54 @@ class AssetForPlatform(unittest.TestCase):
 
     def test_missing_asset(self):
         self.assertIsNone(updates._asset_for_platform([], "darwin"))
+
+
+class CanSelfUpdate(unittest.TestCase):
+    """Self-update is allowed only for the frozen macOS/Windows build."""
+
+    def test_frozen_macos_can_self_update(self):
+        with mock.patch.object(updates.sys, "platform", "darwin"), \
+             mock.patch.object(updates.sys, "frozen", True, create=True):
+            self.assertTrue(updates.can_self_update())
+
+    def test_frozen_windows_can_self_update(self):
+        with mock.patch.object(updates.sys, "platform", "win32"), \
+             mock.patch.object(updates.sys, "frozen", True, create=True):
+            self.assertTrue(updates.can_self_update())
+
+    def test_frozen_linux_cannot_self_update(self):
+        # A deb/rpm owns its files; never overwrite them in place.
+        with mock.patch.object(updates.sys, "platform", "linux"), \
+             mock.patch.object(updates.sys, "frozen", True, create=True):
+            self.assertFalse(updates.can_self_update())
+
+    def test_source_macos_cannot_self_update(self):
+        # Running from source isn't frozen → nothing to swap.
+        with mock.patch.object(updates.sys, "platform", "darwin"), \
+             mock.patch.object(updates.sys, "frozen", False, create=True):
+            self.assertFalse(updates.can_self_update())
+
+
+class PackagedLinuxDetection(unittest.TestCase):
+    def test_usr_bin_is_packaged(self):
+        with mock.patch.object(updates.sys, "platform", "linux"), \
+             mock.patch.object(updates.sys, "executable", "/usr/bin/spuk"):
+            self.assertTrue(updates._is_packaged_linux_install())
+
+    def test_opt_is_packaged(self):
+        with mock.patch.object(updates.sys, "platform", "linux"), \
+             mock.patch.object(updates.sys, "executable", "/opt/spuk/spuk"):
+            self.assertTrue(updates._is_packaged_linux_install())
+
+    def test_home_checkout_is_not_packaged(self):
+        with mock.patch.object(updates.sys, "platform", "linux"), \
+             mock.patch.object(updates.sys, "executable", "/home/user/spuk/.venv/bin/python"):
+            self.assertFalse(updates._is_packaged_linux_install())
+
+    def test_non_linux_is_not_packaged_linux(self):
+        with mock.patch.object(updates.sys, "platform", "darwin"), \
+             mock.patch.object(updates.sys, "executable", "/usr/bin/python"):
+            self.assertFalse(updates._is_packaged_linux_install())
 
 
 if __name__ == "__main__":
