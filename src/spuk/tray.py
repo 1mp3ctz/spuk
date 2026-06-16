@@ -9,7 +9,6 @@ background thread.
 from __future__ import annotations
 
 import logging
-import os
 
 from .config import Config
 from .core import SpukCore
@@ -59,9 +58,9 @@ def run_tray(config: Config, core: SpukCore) -> None:
 
     def on_quit(icon, item):
         log.info("Quitting Spuk.")
-        # Hard-exit: os._exit reclaims the hotkey listener thread without tearing
-        # down the macOS CGEventTap (which traps → "Python quit unexpectedly").
-        os._exit(0)
+        # Clean stop: end the tray loop and let the process exit normally. The
+        # hotkey listener is a daemon thread, so it doesn't block shutdown.
+        icon.stop()
 
     menu = Menu(
         MenuItem(lambda item: f"Spuk — {lang_label(core.language)}", None, enabled=False),
