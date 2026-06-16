@@ -15,6 +15,11 @@ dependencies = [
     "pystray>=0.19,<0.20",         # cross-platform system-tray icon (macOS + Windows)
     "pillow>=10,<12",              # generate the tray icon at runtime
     "pyside6>=6.6,<7",
+    # Linux only: read /dev/input for the global hotkey and inject paste via
+    # /dev/uinput (works under X11 AND Wayland, unlike pynput). The marker keeps
+    # it off macOS/Windows, where it can't build (it compiles against Linux input
+    # headers). Import name and PyPI distribution are both 'evdev'.
+    "evdev; sys_platform == 'linux'",
 ]
 
 [project.scripts]

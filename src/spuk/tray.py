@@ -78,9 +78,10 @@ def run_tray(config: Config, core: SpukCore) -> None:
     # Refresh the menu (title + checkmark) when language changes via hotkey.
     core.on_language_change = lambda _lang: icon.update_menu()
 
-    # Start the global hotkey listener on a background thread, then warm the
-    # model, then block on the tray (main thread).
-    listener_box["listener"] = core.make_listener().start()
+    # Start the global hotkey backend on a background thread, then warm the
+    # model, then block on the tray (main thread). Backend is pynput on
+    # macOS/Windows, evdev on Linux — both return a handle with .stop().
+    listener_box["listener"] = core.make_input_backend().start()
     log.info("Warming model… (first launch downloads it)")
     core.warm()
     log.info(

@@ -149,6 +149,17 @@ class SpukCore:
             double_tap_seconds=self._cfg.hotkey.double_tap_seconds,
         )
 
+    def make_input_backend(self):
+        """The platform-selected hotkey backend driving the FSM above.
+
+        pynput on macOS/Windows, evdev on Linux — both expose ``run()`` (block)
+        and ``start()`` (background, returns a handle with ``stop()``). The UIs
+        and the headless loop drive this, not pynput directly.
+        """
+        from .input_backend import make_input_backend
+
+        return make_input_backend(self.make_listener())
+
     def run_headless(self) -> None:
         log.info(
             "Spuk ready. Mode=%s  Hotkey=%s  Cycle=%s  Language=%s",
@@ -157,7 +168,7 @@ class SpukCore:
         )
         log.info("Hold the hotkey and speak; release to transcribe & paste. Ctrl-C to quit.")
         try:
-            self.make_listener().run()  # blocks until Ctrl-C
+            self.make_input_backend().run()  # blocks until Ctrl-C
         except KeyboardInterrupt:
             log.info("Shutting down.")
 

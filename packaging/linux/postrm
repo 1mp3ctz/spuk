@@ -1,0 +1,42 @@
+#!/bin/sh
+# Spuk post-removal scriptlet (shared by the .deb and .rpm packages).
+#
+# Runs as root after the package files are removed. Idempotent and non-fatal:
+#   1. Remove the /usr/bin/spuk launcher symlink if it still points into /opt/spuk
+#      (package managers track files they installed, but the symlink is recreated
+#      defensively by some flows, so we clean it explicitly and harmlessly).
+#   2. Refresh the icon cache + desktop database so the menu entry disappears.
+#
+# It deliberately does NOT remove anyone from the 'input' group: that membership
+# may be relied on by other tools and is the user's to manage.
+#
+# POSIX sh only (dpkg runs maintainer scripts with /bin/sh = dash).
+
+set -e
+
+BIN_LINK="/usr/bin/spuk"
+ICON_THEME_DIR="/usr/share/icons/hicolor"
+DESKTOP_DIR="/usr/share/applications"
+
+# --- 1. Remove the launcher symlink (only if it's ours) ---------------------
+#
+# Guard on it being a symlink resolving into /opt/spuk so we never delete an
+# unrelated /usr/bin/spuk a user may have created.
+if [ -L "${BIN_LINK}" ]; then
+    target=$(readlink "${BIN_LINK}" 2>/dev/null || echo "")
+    case "${target}" in
+        /opt/spuk/*) rm -f "${BIN_LINK}" >/dev/null 2>&1 || true ;;
+    esac
+fi
+
+# --- 2. Refresh caches (best-effort; never fatal) ---------------------------
+
+if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+    gtk-update-icon-cache -f -t -q "${ICON_THEME_DIR}" >/dev/null 2>&1 || true
+fi
+
+if command -v update-desktop-database >/dev/null 2>&1; then
+    update-desktop-database -q "${DESKTOP_DIR}" >/dev/null 2>&1 || true
+fi
+
+exit 0

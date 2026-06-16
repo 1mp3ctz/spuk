@@ -126,8 +126,36 @@ def check_for_update(current: str, timeout: float = 6.0) -> UpdateResult:
 # --- self-update (packaged builds only) ------------------------------------
 
 
+# Directory prefixes a Linux package manager (deb/rpm) owns. A build installed
+# under one of these must NOT self-update: overwriting package-managed files is
+# wrong (it breaks the package DB and needs root). Such installs update via apt /
+# dnf, so we fall back to opening the release page instead.
+_LINUX_MANAGED_PREFIXES = ("/usr", "/opt", "/bin", "/sbin", "/lib")
+
+
+def _is_packaged_linux_install() -> bool:
+    """Whether we're a Linux build living under a package-manager-owned prefix."""
+    if sys.platform != "linux":
+        return False
+    try:
+        exe = Path(sys.executable).resolve()
+    except Exception:  # noqa: BLE001
+        return False
+    return any(str(exe).startswith(prefix + os.sep) for prefix in _LINUX_MANAGED_PREFIXES)
+
+
 def can_self_update() -> bool:
-    """True only for the frozen .app / .exe on a platform we can swap in place."""
+    """True only when Spuk may overwrite its own files to update in place.
+
+    In-place self-update is for the frozen .app / .exe on macOS / Windows. It is
+    OFF on Linux: a deb/rpm owns its files (so we never clobber a package-managed
+    install — see ``_is_packaged_linux_install``), and a from-source checkout has
+    nothing to swap. Either way the UI falls back to opening the release page.
+    Running from source on macOS/Windows keeps the existing (False) behaviour too,
+    since it isn't frozen.
+    """
+    if sys.platform == "linux" or _is_packaged_linux_install():
+        return False
     return bool(getattr(sys, "frozen", False)) and sys.platform in ("darwin", "win32")
 
 

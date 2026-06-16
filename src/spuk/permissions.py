@@ -42,6 +42,18 @@ _GUIDANCE = (
     "  Re-clicking the popup will NOT help: macOS only re-checks on a fresh launch."
 )
 
+_LINUX_GUIDANCE = (
+    "Spuk needs permission to read your keyboard and synthesize the paste key.\n"
+    "  On Linux the hotkey is read from /dev/input and paste is injected via "
+    "/dev/uinput — both require your user to be in the 'input' group:\n"
+    "    sudo usermod -aG input $USER\n"
+    "  then LOG OUT and back in (group changes only apply to new sessions).\n"
+    "  Alternatively install and start ydotool (+ ydotoold) for paste injection.\n"
+    "  Also install a clipboard tool so text can be set: wl-clipboard (Wayland) "
+    "or xclip / xsel (X11).\n"
+    "  Spuk still launches; the hotkey just won't fire until this is fixed."
+)
+
 
 def accessibility_trusted(prompt: bool = False) -> bool:
     """Whether this process is trusted for Accessibility.
@@ -134,15 +146,75 @@ def request_input_monitoring() -> bool | None:
         return None
 
 
+# --- Linux: input-device read + uinput-write access ------------------------
+#
+# Unlike macOS (system permission prompts), Linux access is POSIX: the user must
+# be able to read /dev/input/* (the hotkey source) and write /dev/uinput (paste
+# injection). Both are granted by membership in the 'input' group on virtually
+# every distro. We check practically — group membership AND actual access to
+# /dev/uinput — and, if missing, log a copy-pasteable remedy without blocking.
+
+
+def _in_input_group() -> bool:
+    """Whether the current user belongs to the 'input' group. False if unknown."""
+    try:
+        import grp
+        import os
+
+        input_gid = grp.getgrnam("input").gr_gid
+        if input_gid in os.getgroups():
+            return True
+        # Primary group fallback (rare, but be correct).
+        return os.getgid() == input_gid
+    except Exception as exc:  # noqa: BLE001 - no 'input' group / no grp module
+        log.debug("Could not determine 'input' group membership: %s", exc)
+        return False
+
+
+def _uinput_accessible() -> bool:
+    """Whether /dev/uinput exists and is writable by this process."""
+    try:
+        import os
+
+        return os.path.exists("/dev/uinput") and os.access("/dev/uinput", os.W_OK)
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def linux_input_access_ok() -> bool:
+    """Whether Linux input read + uinput write look usable.
+
+    True when the user is in the 'input' group OR /dev/uinput is already writable
+    (some setups grant access via udev rules without the group). This is a
+    best-effort signal mirroring the macOS trust check; it never raises.
+    """
+    return _in_input_group() or _uinput_accessible()
+
+
+def _ensure_linux_permissions() -> bool:
+    """Check Linux input/uinput access; log a remedy if missing. Never blocks."""
+    if linux_input_access_ok():
+        log.debug("Linux input access OK (input group or /dev/uinput writable).")
+        return True
+    log.warning("%s", _LINUX_GUIDANCE)
+    return False
+
+
 def ensure_permissions(prompt: bool = True) -> bool:
     """Ensure the hotkey + paste permissions are granted. Returns True if good.
 
     Silent when already trusted — no nagging popup. Only raises the system
-    Accessibility prompt when trust is actually missing. Always True off macOS.
+    Accessibility prompt when trust is actually missing (macOS). On Linux,
+    checks input-device / uinput access and logs a copy-pasteable remedy when
+    missing. Always True on platforms with nothing to check.
+
     The app should keep running even when this returns False (so the UI still
-    appears); the hotkey simply won't fire until the user grants + relaunches.
+    appears); the hotkey simply won't fire until the user fixes access.
     """
-    if platform.system() != "Darwin":
+    system = platform.system()
+    if system == "Linux":
+        return _ensure_linux_permissions()
+    if system != "Darwin":
         return True
 
     ax_ok = accessibility_trusted(prompt=False)
