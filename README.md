@@ -196,6 +196,11 @@ offline and free afterwards, exactly like on Mac and Windows.
   the text in. Great for longer dictation when you don't want to hold the keys down.
 - **Switch language:** press **`Ctrl` + `Shift` + `L`** to cycle through the languages
   you've added, or pick one from the hover bar. The current language shows on the pill.
+- **Change your keys:** open **Settings** (⚙) → **Hotkeys**, click **Change** next to
+  "Talk" or "Switch language", and **press the keys you want** — that combo becomes your
+  new shortcut right away. Pick **hold-to-talk** or **press-to-toggle**, and there's
+  always **Reset hotkeys to default** to get the originals back. Your choices are
+  remembered between restarts. *(You can still edit `config.toml` by hand if you prefer.)*
 - **Add a language:** click the **⚙ gear** on the pill (or the menu-bar ghost →
   **Settings…**) to open Settings, then use **"Add a language…"** to pick from the
   ~100 the speech model supports. Your chosen languages appear as quick-switch buttons
