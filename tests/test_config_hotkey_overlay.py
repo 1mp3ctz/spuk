@@ -44,3 +44,10 @@ def test_overlay_no_settings_keeps_defaults(monkeypatch):
     h = _defaults()
     _overlay_user_hotkey(h)
     assert h == _defaults()
+
+
+def test_overlay_applies_paste_key(monkeypatch):
+    monkeypatch.setattr(ss, "load_user_settings", lambda: {"paste_key": "<ctrl>+<shift>+v"})
+    h = _defaults()
+    _overlay_user_hotkey(h)
+    assert h["paste_key"] == "<ctrl>+<shift>+v"

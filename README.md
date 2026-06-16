@@ -200,7 +200,9 @@ offline and free afterwards, exactly like on Mac and Windows.
   "Talk" or "Switch language", and **press the keys you want** — that combo becomes your
   new shortcut right away. Pick **hold-to-talk** or **press-to-toggle**, and there's
   always **Reset hotkeys to default** to get the originals back. Your choices are
-  remembered between restarts. *(You can still edit `config.toml` by hand if you prefer.)*
+  remembered between restarts. **Dictating into a terminal** (e.g. VS Code / Cursor)?
+  Set **"Paste with: Terminal (Ctrl+Shift+V)"** in the same panel — terminals don't
+  treat plain Ctrl+V as paste. *(You can still edit `config.toml` by hand if you prefer.)*
 - **Add a language:** click the **⚙ gear** on the pill (or the menu-bar ghost →
   **Settings…**) to open Settings, then use **"Add a language…"** to pick from the
   ~100 the speech model supports. Your chosen languages appear as quick-switch buttons

@@ -44,23 +44,48 @@ _PASTE_SETTLE_S = 0.15
 # the platform factory below so the wrong backend is never imported/constructed.
 PasteInjector = Callable[[], None]
 _injector: PasteInjector | None = None
+# The paste shortcut Spuk sends. None/"" = the OS default (Cmd+V on macOS, Ctrl+V
+# elsewhere). Set via set_paste_shortcut() from config/Settings — e.g.
+# "<ctrl>+<shift>+v" so dictation works in terminals (VS Code / Cursor), where
+# plain Ctrl+V is not "paste".
+_paste_combo: str | None = None
 
 
-def _build_pynput_injector() -> PasteInjector:
-    """macOS/Windows injector: synthesize Cmd+V (macOS) / Ctrl+V via pynput.
+def _default_paste_combo() -> str:
+    return "<cmd>+v" if platform.system() == "Darwin" else "<ctrl>+v"
+
+
+def _resolve_combo(combo: str | None) -> str:
+    """The combo to actually send: the user's choice, or the OS default."""
+    return combo if combo else _default_paste_combo()
+
+
+def set_paste_shortcut(combo: str | None) -> None:
+    """Choose the shortcut Spuk sends to paste; applied on the next paste.
+
+    ``combo`` is a canonical combo string ("<ctrl>+<shift>+v") or None/"" for the
+    OS default. Safe to call anytime — the injector is rebuilt on the next paste.
+    """
+    global _paste_combo, _injector
+    _paste_combo = combo or None
+    _injector = None  # force a rebuild with the new combo
+
+
+def _build_pynput_injector(combo: str | None) -> PasteInjector:
+    """macOS/Windows injector: synthesize the paste combo via pynput.
 
     Imported and constructed lazily so Linux never builds a pynput Controller.
     """
-    from pynput.keyboard import Controller, Key
+    from pynput.keyboard import Controller, HotKey
 
     keyboard = Controller()
-    modifier = Key.cmd if platform.system() == "Darwin" else Key.ctrl
+    keys = HotKey.parse(_resolve_combo(combo))  # e.g. [Key.ctrl, Key.shift, KeyCode('v')]
 
     def send_paste() -> None:
-        keyboard.press(modifier)
-        keyboard.press("v")
-        keyboard.release("v")
-        keyboard.release(modifier)
+        for k in keys:
+            keyboard.press(k)
+        for k in reversed(keys):
+            keyboard.release(k)
 
     return send_paste
 
@@ -70,8 +95,8 @@ def _build_injector() -> PasteInjector:
     if platform.system() == "Linux":
         from .linux_input import build_linux_paste_injector
 
-        return build_linux_paste_injector()
-    return _build_pynput_injector()
+        return build_linux_paste_injector(_resolve_combo(_paste_combo))
+    return _build_pynput_injector(_paste_combo)
 
 
 def _get_injector() -> PasteInjector:

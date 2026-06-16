@@ -268,8 +268,35 @@ def _uinput_writable() -> bool:
     return os.path.exists(UINPUT_DEVICE) and os.access(UINPUT_DEVICE, os.W_OK)
 
 
-def _build_uinput_paste_injector():
-    """Injector that taps Ctrl+V through a uinput virtual keyboard, or None.
+_PASTE_MODIFIER_KEYCODE_NAMES = {
+    "<ctrl>": "KEY_LEFTCTRL",
+    "<shift>": "KEY_LEFTSHIFT",
+    "<alt>": "KEY_LEFTALT",
+    "<cmd>": "KEY_LEFTMETA",
+}
+
+
+def _combo_to_keycodes(combo: str) -> list:
+    """Map a canonical combo string ('<ctrl>+<shift>+v') to evdev keycodes.
+
+    Modifiers first, then the key, in press order. Raises if a token has no evdev
+    keycode (caller falls back to Ctrl+V).
+    """
+    from evdev import ecodes
+
+    codes = []
+    for tok in (t for t in combo.split("+") if t):
+        if tok in _PASTE_MODIFIER_KEYCODE_NAMES:
+            codes.append(getattr(ecodes, _PASTE_MODIFIER_KEYCODE_NAMES[tok]))
+        elif tok.startswith("<") and tok.endswith(">"):
+            codes.append(getattr(ecodes, f"KEY_{tok[1:-1].upper()}"))  # <f8> -> KEY_F8
+        else:
+            codes.append(getattr(ecodes, f"KEY_{tok.upper()}"))  # v -> KEY_V
+    return codes
+
+
+def _build_uinput_paste_injector(keycodes):
+    """Injector that taps the paste combo through a uinput virtual keyboard, or None.
 
     Returns None when uinput can't be opened so the caller can fall back to
     ydotool. The virtual device is created once and reused.
@@ -281,37 +308,38 @@ def _build_uinput_paste_injector():
         return None
 
     try:
-        capabilities = {ecodes.EV_KEY: [ecodes.KEY_LEFTCTRL, ecodes.KEY_V]}
-        ui = UInput(capabilities, name="spuk-virtual-keyboard")
+        ui = UInput({ecodes.EV_KEY: keycodes}, name="spuk-virtual-keyboard")
     except Exception as exc:  # noqa: BLE001 - PermissionError / missing module
         log.debug("Could not open /dev/uinput for injection: %s", exc)
         return None
 
     def send_paste() -> None:
-        ui.write(ecodes.EV_KEY, ecodes.KEY_LEFTCTRL, 1)
-        ui.write(ecodes.EV_KEY, ecodes.KEY_V, 1)
+        for code in keycodes:  # modifiers then key
+            ui.write(ecodes.EV_KEY, code, 1)
         ui.syn()
-        ui.write(ecodes.EV_KEY, ecodes.KEY_V, 0)
-        ui.write(ecodes.EV_KEY, ecodes.KEY_LEFTCTRL, 0)
+        for code in reversed(keycodes):  # release in reverse
+            ui.write(ecodes.EV_KEY, code, 0)
         ui.syn()
 
     log.info("Linux paste injection: using /dev/uinput virtual keyboard.")
     return send_paste
 
 
-def _build_ydotool_paste_injector():
-    """Injector that taps Ctrl+V via the ``ydotool`` CLI, or None if absent.
+def _build_ydotool_paste_injector(keycodes):
+    """Injector that taps the paste combo via the ``ydotool`` CLI, or None if absent.
 
-    ydotool key codes are evdev codes with a press/release suffix:
-    29:1 (LEFTCTRL down) 47:1 (V down) 47:0 (V up) 29:0 (LEFTCTRL up).
+    ydotool takes evdev keycodes with a press/release suffix, e.g. Ctrl+V is
+    "29:1 47:1 47:0 29:0" (29=LEFTCTRL, 47=V).
     """
     ydotool = shutil.which("ydotool")
     if not ydotool:
         return None
 
+    seq = [f"{c}:1" for c in keycodes] + [f"{c}:0" for c in reversed(keycodes)]
+
     def send_paste() -> None:
         subprocess.run(
-            [ydotool, "key", "29:1", "47:1", "47:0", "29:0"],
+            [ydotool, "key", *seq],
             check=False,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
@@ -321,14 +349,26 @@ def _build_ydotool_paste_injector():
     return send_paste
 
 
-def build_linux_paste_injector() -> Callable[[], None]:
-    """Pick the Linux paste injector: prefer uinput, fall back to ydotool.
+def build_linux_paste_injector(combo: str = "<ctrl>+v") -> Callable[[], None]:
+    """Pick the Linux paste injector for ``combo``: prefer uinput, fall back to ydotool.
 
-    Always returns a callable. If neither path is available the returned callable
-    logs a clear remedy (so a single failed paste doesn't crash the loop) rather
-    than raising at construction time.
+    ``combo`` is a canonical combo string ("<ctrl>+v", "<ctrl>+<shift>+v"). Always
+    returns a callable. If neither path is available the returned callable logs a
+    clear remedy (so a single failed paste doesn't crash the loop) rather than
+    raising at construction time.
     """
-    injector = _build_uinput_paste_injector() or _build_ydotool_paste_injector()
+    try:
+        keycodes = _combo_to_keycodes(combo)
+    except Exception as exc:  # noqa: BLE001 - unknown token or evdev missing
+        log.warning("Could not map paste combo %r (%s); falling back.", combo, exc)
+        try:
+            from evdev import ecodes
+
+            keycodes = [ecodes.KEY_LEFTCTRL, ecodes.KEY_V]
+        except Exception:  # noqa: BLE001 - evdev unavailable; builders below will no-op
+            keycodes = []
+
+    injector = _build_uinput_paste_injector(keycodes) or _build_ydotool_paste_injector(keycodes)
     if injector is not None:
         return injector
 
