@@ -63,7 +63,7 @@ class SpukWindow(QWidget):
         self._core = core
         self._quit = None  # set by run_bar
         self.setWindowTitle("Spuk — Settings")
-        self.setFixedSize(400, 770)
+        self.setFixedSize(400, 820)
         self._build_ui()
         self._wire(signals)
 
@@ -261,6 +261,17 @@ class SpukWindow(QWidget):
         self._handsfree.stateChanged.connect(self._handsfree_changed)
         v.addWidget(self._handsfree)
 
+        # Paste shortcut — what Spuk SENDS to paste. Terminals (VS Code / Cursor)
+        # need Ctrl+Shift+V; plain Ctrl+V isn't "paste" there.
+        self._paste = QComboBox()
+        self._paste.setObjectName("mic")
+        self._paste.setMinimumHeight(40)
+        self._paste.addItem("Paste with: Default (Ctrl+V / Cmd+V)", "")
+        self._paste.addItem("Paste with: Terminal (Ctrl+Shift+V)", "<ctrl>+<shift>+v")
+        self._paste.setCurrentIndex(1 if hk.paste_key else 0)
+        self._paste.currentIndexChanged.connect(self._paste_changed)
+        v.addWidget(self._paste)
+
         # Inline validation / status message.
         self._hk_msg = QLabel("")
         self._hk_msg.setObjectName("priv")
@@ -340,6 +351,9 @@ class SpukWindow(QWidget):
     def _handsfree_changed(self, _state: int) -> None:
         self._core.rebind_hotkeys(handsfree=self._handsfree.isChecked())
 
+    def _paste_changed(self, _i: int) -> None:
+        self._core.set_paste_shortcut(self._paste.currentData())
+
     def _reset_hotkeys(self) -> None:
         self._core.reset_hotkeys()
         self._hk_msg.setText("Reset to defaults.")
@@ -357,6 +371,9 @@ class SpukWindow(QWidget):
         self._handsfree.setChecked(hk.handsfree)
         self._handsfree.setEnabled(hk.mode == "push_to_talk")
         self._handsfree.blockSignals(False)
+        self._paste.blockSignals(True)
+        self._paste.setCurrentIndex(1 if hk.paste_key else 0)
+        self._paste.blockSignals(False)
 
     # --- core wiring -----------------------------------------------------
 

@@ -23,6 +23,8 @@ key         = "<ctrl>+<alt>"           # Ctrl+Option (macOS), Strg+Alt (Windows)
 cycle_language = "<ctrl>+<shift>+l"    # cycle English -> German -> Polish (kept off Ctrl+Alt to avoid triggering record)
 handsfree          = true              # double-tap the hotkey to record hands-free; press once more to stop + transcribe
 double_tap_seconds = 0.4               # how quick the double-tap must be (also the tap-vs-hold cutoff)
+paste_key   = ""                       # shortcut Spuk SENDS to paste. "" = OS default (Cmd+V / Ctrl+V).
+                                       # Set "<ctrl>+<shift>+v" for terminals (VS Code / Cursor). Also in Settings → Hotkeys.
 
 [audio]
 samplerate  = 16000                # Whisper's native rate — capture here to avoid resampling

@@ -27,7 +27,7 @@ from .transcriber import build_transcriber
 log = logging.getLogger("spuk")
 
 
-def with_hotkey(hk, *, key=None, cycle_language=None, mode=None, handsfree=None):
+def with_hotkey(hk, *, key=None, cycle_language=None, mode=None, handsfree=None, paste_key=None):
     """Return a NEW HotkeyConfig with the given fields changed (immutability)."""
     changes = {}
     if key is not None:
@@ -38,10 +38,12 @@ def with_hotkey(hk, *, key=None, cycle_language=None, mode=None, handsfree=None)
         changes["mode"] = mode
     if handsfree is not None:
         changes["handsfree"] = handsfree
+    if paste_key is not None:
+        changes["paste_key"] = paste_key
     return dataclasses.replace(hk, **changes)
 
 
-def hotkey_settings(*, key=None, cycle_language=None, mode=None, handsfree=None) -> dict:
+def hotkey_settings(*, key=None, cycle_language=None, mode=None, handsfree=None, paste_key=None) -> dict:
     """Map changed hotkey fields to their settings.json keys (skip unset)."""
     out = {}
     if key is not None:
@@ -52,6 +54,8 @@ def hotkey_settings(*, key=None, cycle_language=None, mode=None, handsfree=None)
         out["hotkey_mode"] = mode
     if handsfree is not None:
         out["hotkey_handsfree"] = handsfree
+    if paste_key is not None:
+        out["paste_key"] = paste_key
     return out
 
 
@@ -61,6 +65,12 @@ class SpukCore:
         self._recorder = Recorder(config.audio)
         self._transcriber = build_transcriber(config.transcribe)
         self._post = build_post_processor(config.post_process)
+
+        # Apply the configured paste shortcut (OS default unless the user picked a
+        # terminal-friendly one like Ctrl+Shift+V for VS Code / Cursor terminals).
+        from .paste import set_paste_shortcut as _apply_paste
+
+        _apply_paste(config.hotkey.paste_key or None)
 
         # The user's curated set of languages (mutable at runtime) and the active
         # one. Seeded from config (which already overlays the user's saved choices).
@@ -264,7 +274,7 @@ class SpukCore:
         from .settings_store import load_user_settings, save_user_settings
 
         data = load_user_settings()
-        for k in ("hotkey_key", "hotkey_cycle_language", "hotkey_mode", "hotkey_handsfree"):
+        for k in ("hotkey_key", "hotkey_cycle_language", "hotkey_mode", "hotkey_handsfree", "paste_key"):
             data.pop(k, None)
         save_user_settings(data)
 
@@ -273,6 +283,24 @@ class SpukCore:
         defaults = load_config().hotkey
         self.rebind_hotkeys(key=defaults.key, cycle_language=defaults.cycle_language,
                             mode=defaults.mode, handsfree=defaults.handsfree)
+        self.set_paste_shortcut(defaults.paste_key)
+
+    def set_paste_shortcut(self, combo: str) -> None:
+        """Set the shortcut Spuk SENDS to paste (not a listened hotkey).
+
+        ``combo`` is a canonical combo string ("<ctrl>+<shift>+v" for terminals) or
+        "" for the OS default. Persisted and applied immediately — no listener
+        restart, since this only changes what Spuk injects after transcribing.
+        """
+        from .paste import set_paste_shortcut as _apply_paste
+        from .settings_store import update_user_settings
+
+        self._cfg = dataclasses.replace(self._cfg, hotkey=with_hotkey(self._cfg.hotkey, paste_key=combo))
+        update_user_settings(**hotkey_settings(paste_key=combo))
+        _apply_paste(combo or None)
+        log.info("Paste shortcut → %s", combo or "(OS default)")
+        if self.on_hotkey_change:
+            self.on_hotkey_change()
 
     def start_capture(self, on_done) -> bool:
         """Capture the next combo via the running FSM listener.
