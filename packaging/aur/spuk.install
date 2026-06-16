@@ -1,0 +1,49 @@
+# pacman install scriptlet for Spuk (referenced by PKGBUILD's `install=`).
+#
+# pacman runs these hooks as root. They print the one-time 'input' group setup
+# note (Spuk reads /dev/input for the hotkey and writes /dev/uinput for paste)
+# and refresh the icon/desktop caches. Group membership is left to the user —
+# we do NOT auto-modify groups here (pacman has no reliable $SUDO_USER, and AUR
+# users expect to manage their own groups).
+
+_refresh_caches() {
+    if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+        gtk-update-icon-cache -f -t -q /usr/share/icons/hicolor >/dev/null 2>&1 || true
+    fi
+    if command -v update-desktop-database >/dev/null 2>&1; then
+        update-desktop-database -q /usr/share/applications >/dev/null 2>&1 || true
+    fi
+}
+
+_input_group_note() {
+    cat <<'EOF'
+
+────────────────────────────────────────────────────────────────────────────
+ Spuk installed.  One-time setup so the hotkey + paste work:
+
+ Spuk reads your keyboard from /dev/input and injects paste via /dev/uinput,
+ both of which require membership in the 'input' group:
+     sudo usermod -aG input "$USER"
+ then LOG OUT and back in (group changes only apply to new sessions).
+
+ Wayland users may also install 'ydotool' (+ start ydotoold) as an alternative
+ paste path. A clipboard tool is required so transcribed text can be set:
+     • Wayland:  wl-clipboard      • X11:  xclip  or  xsel
+
+ Run with:  spuk
+────────────────────────────────────────────────────────────────────────────
+EOF
+}
+
+post_install() {
+    _refresh_caches
+    _input_group_note
+}
+
+post_upgrade() {
+    _refresh_caches
+}
+
+post_remove() {
+    _refresh_caches
+}
