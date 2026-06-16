@@ -225,7 +225,12 @@ class SpukCore:
             self._backend = None
 
     def rebind_hotkeys(self, *, key=None, cycle_language=None, mode=None, handsfree=None) -> None:
-        """Apply new hotkey settings live: persist, then restart the listener."""
+        """Apply new hotkey settings live, IN PLACE (no listener restart).
+
+        Stopping and recreating the pynput CGEventTap mid-run to apply a new
+        hotkey crashes on macOS (SIGTRAP). Instead the running listener keeps its
+        reader thread(s) alive and we just re-point the combos it matches.
+        """
         previous = self._cfg.hotkey
         new_hotkey = with_hotkey(previous, key=key, cycle_language=cycle_language,
                                  mode=mode, handsfree=handsfree)
@@ -237,13 +242,17 @@ class SpukCore:
                                                mode=mode, handsfree=handsfree))
 
         try:
-            self.stop_input()
-            self.start_input()
-        except Exception as exc:  # noqa: BLE001 - roll back so the user isn't stuck
-            log.error("Rebind failed (%s); rolling back.", exc)
+            if self._listener is not None:
+                self._listener.update_bindings(
+                    key_combo=new_hotkey.key,
+                    mode=new_hotkey.mode,
+                    taps={new_hotkey.cycle_language: self.cycle_language},
+                    handsfree=new_hotkey.handsfree,
+                    double_tap_seconds=new_hotkey.double_tap_seconds,
+                )
+        except Exception as exc:  # noqa: BLE001 - revert so the user isn't stuck
+            log.error("Rebind failed (%s); reverting.", exc)
             self._cfg = dataclasses.replace(self._cfg, hotkey=previous)
-            self.stop_input()
-            self.start_input()
             raise
         log.info("Hotkeys rebound: key=%s cycle=%s mode=%s handsfree=%s",
                  new_hotkey.key, new_hotkey.cycle_language, new_hotkey.mode, new_hotkey.handsfree)

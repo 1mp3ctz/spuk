@@ -41,6 +41,40 @@ def test_capture_can_be_cancelled():
     assert got == []
 
 
+def test_update_bindings_swaps_combo_in_place():
+    started = []
+    lis = _listener(on_start=lambda: started.append(1))
+    # Rebind talk from Ctrl+Alt to Ctrl+Shift, with no restart.
+    lis.update_bindings(key_combo="<ctrl>+<shift>", mode="push_to_talk",
+                        taps={}, handsfree=True, double_tap_seconds=0.4)
+    # The OLD chord (Ctrl+Alt) must no longer start recording.
+    lis._feed_press(Key.ctrl)
+    lis._feed_press(Key.alt)
+    assert started == []
+    lis._feed_release(Key.alt)
+    lis._feed_release(Key.ctrl)
+    # The NEW chord (Ctrl+Shift) must start recording.
+    lis._feed_press(Key.ctrl)
+    lis._feed_press(Key.shift)
+    assert started == [1]
+
+
+def test_update_bindings_switches_to_toggle_mode():
+    events = []
+    lis = _listener(on_start=lambda: events.append("start"), on_stop=lambda: events.append("stop"))
+    lis.update_bindings(key_combo="<ctrl>+<alt>", mode="toggle",
+                        taps={}, handsfree=False, double_tap_seconds=0.4)
+    # press 1 -> start
+    lis._feed_press(Key.ctrl)
+    lis._feed_press(Key.alt)
+    lis._feed_release(Key.alt)
+    lis._feed_release(Key.ctrl)
+    # press 2 -> stop
+    lis._feed_press(Key.ctrl)
+    lis._feed_press(Key.alt)
+    assert events == ["start", "stop"]
+
+
 def test_after_capture_fsm_works_again():
     started = []
     lis = _listener(on_start=lambda: started.append(1))
