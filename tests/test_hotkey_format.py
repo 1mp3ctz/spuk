@@ -27,6 +27,11 @@ def test_combo_to_label_is_friendly():
     assert combo_to_label("<ctrl>+<shift>+l") == "Ctrl + Shift + L"
 
 
+def test_combo_to_label_special_keys():
+    assert combo_to_label("<ctrl>+<shift>+<space>") == "Ctrl + Shift + Space"
+    assert combo_to_label("<f8>") == "F8"
+
+
 @pytest.mark.parametrize(
     "combo, ok",
     [
