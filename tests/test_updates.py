@@ -1,9 +1,31 @@
 """Version-comparison logic for the update checker (no network)."""
 
+import tempfile
 import unittest
+from pathlib import Path
 from unittest import mock
 
 from spuk import updates
+
+
+class _FakeResponse:
+    """Minimal stand-in for an http response: context manager + headers + read()."""
+
+    def __init__(self, data: bytes, total: int | None = None) -> None:
+        self._data = data
+        self._pos = 0
+        self.headers = {"Content-Length": str(len(data) if total is None else total)}
+
+    def __enter__(self) -> "_FakeResponse":
+        return self
+
+    def __exit__(self, *exc) -> bool:
+        return False
+
+    def read(self, n: int) -> bytes:
+        chunk = self._data[self._pos : self._pos + n]
+        self._pos += len(chunk)
+        return chunk
 
 
 class ParseVersion(unittest.TestCase):
@@ -95,6 +117,40 @@ class PackagedLinuxDetection(unittest.TestCase):
         with mock.patch.object(updates.sys, "platform", "darwin"), \
              mock.patch.object(updates.sys, "executable", "/usr/bin/python"):
             self.assertFalse(updates._is_packaged_linux_install())
+
+
+class DownloadProgress(unittest.TestCase):
+    """The download streams in chunks, reporting progress and honouring cancel."""
+
+    def test_reports_increasing_progress_ending_at_total(self):
+        data = b"x" * (1024 * 1024 + 777)  # spans several read() chunks
+        calls: list[tuple[int, int]] = []
+        with mock.patch.object(updates.urllib.request, "urlopen", return_value=_FakeResponse(data)):
+            with tempfile.TemporaryDirectory() as d:
+                path = updates._download_zip(
+                    "http://x/u.zip", Path(d), progress=lambda done, total: calls.append((done, total))
+                )
+                self.assertTrue(path.exists())
+                self.assertEqual(path.read_bytes(), data)
+        self.assertGreater(len(calls), 1)
+        dones = [c[0] for c in calls]
+        self.assertEqual(dones, sorted(dones))            # never goes backwards
+        self.assertEqual(dones[-1], len(data))            # ends at the full size
+        self.assertEqual(calls[-1][1], len(data))         # total reported correctly
+
+    def test_cancel_aborts_with_update_cancelled(self):
+        data = b"x" * (1024 * 1024)
+        with mock.patch.object(updates.urllib.request, "urlopen", return_value=_FakeResponse(data)):
+            with tempfile.TemporaryDirectory() as d:
+                with self.assertRaises(updates.UpdateCancelled):
+                    updates._download_zip("http://x/u.zip", Path(d), cancel=lambda: True)
+
+    def test_works_without_progress_or_cancel(self):
+        data = b"hello-zip"
+        with mock.patch.object(updates.urllib.request, "urlopen", return_value=_FakeResponse(data)):
+            with tempfile.TemporaryDirectory() as d:
+                path = updates._download_zip("http://x/u.zip", Path(d))
+                self.assertEqual(path.read_bytes(), data)
 
 
 if __name__ == "__main__":

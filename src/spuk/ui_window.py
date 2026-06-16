@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QMessageBox,
+    QProgressDialog,
     QPushButton,
     QScrollArea,
     QVBoxLayout,
@@ -56,12 +57,18 @@ class SpukWindow(QWidget):
     _update_done = Signal(object)
     # Emitted when a self-update finishes staging: (ok, error_message).
     _self_update_done = Signal(bool, str)
+    # Emitted from the download thread with (downloaded_bytes, total_bytes) so the
+    # progress bar updates on the Qt main thread.
+    _self_update_progress = Signal(int, int)
 
     def __init__(self, config: Config, core: SpukCore, signals: CoreSignals) -> None:
         super().__init__()
         self._cfg = config
         self._core = core
         self._quit = None  # set by run_bar
+        # In-app update download state (set while a self-update is running).
+        self._update_dialog: QProgressDialog | None = None
+        self._update_cancel = threading.Event()
         self.setWindowTitle("Spuk — Settings")
         self.setFixedSize(400, 820)
         self._build_ui()
@@ -180,6 +187,7 @@ class SpukWindow(QWidget):
 
         self._update_done.connect(self._show_update_result)
         self._self_update_done.connect(self._on_self_update_done)
+        self._self_update_progress.connect(self._on_self_update_progress)
         self.setStyleSheet(_QSS)
 
     def _populate_mics(self) -> None:
@@ -463,21 +471,59 @@ class SpukWindow(QWidget):
                 webbrowser.open(result.url)
 
     def _start_self_update(self, asset_url: str) -> None:
-        """Download the new build and stage the in-place swap (off the UI thread)."""
+        """Download the new build (off the UI thread) with a live progress bar."""
         self._update_btn.setEnabled(False)
         self._update_btn.setText("Updating…")
 
+        # A modal progress dialog so the ~100-200 MB download never looks frozen.
+        # Indeterminate (0,0) until the first byte count arrives; Cancel sets an
+        # Event the download thread polls between chunks.
+        self._update_cancel.clear()
+        dialog = QProgressDialog("Downloading update…", "Cancel", 0, 0, self)
+        dialog.setWindowTitle("Updating Spuk")
+        dialog.setWindowModality(Qt.WindowModal)
+        dialog.setMinimumDuration(0)
+        dialog.setAutoClose(False)
+        dialog.setAutoReset(False)
+        dialog.canceled.connect(self._update_cancel.set)
+        self._update_dialog = dialog
+        dialog.show()
+
         def worker() -> None:
             try:
-                updates.self_update(asset_url)
+                updates.self_update(
+                    asset_url,
+                    progress=lambda done, total: self._self_update_progress.emit(done, total),
+                    cancel=self._update_cancel.is_set,
+                )
                 self._self_update_done.emit(True, "")
+            except updates.UpdateCancelled:
+                self._self_update_done.emit(False, "")  # empty message = user cancelled
             except Exception as exc:  # noqa: BLE001
                 log.warning("Self-update failed: %s", exc)
                 self._self_update_done.emit(False, str(exc))
 
         threading.Thread(target=worker, daemon=True).start()
 
+    def _on_self_update_progress(self, done: int, total: int) -> None:
+        dialog = self._update_dialog
+        if dialog is None:
+            return
+        if total > 0:
+            mb_done, mb_total = done / 1048576, total / 1048576
+            dialog.setMaximum(total)
+            dialog.setValue(done)
+            dialog.setLabelText(f"Downloading update… {mb_done:.0f} / {mb_total:.0f} MB")
+        else:  # server gave no size — keep it indeterminate but show bytes
+            dialog.setLabelText(f"Downloading update… {done / 1048576:.0f} MB")
+
+    def _close_update_dialog(self) -> None:
+        if self._update_dialog is not None:
+            self._update_dialog.close()
+            self._update_dialog = None
+
     def _on_self_update_done(self, ok: bool, message: str) -> None:
+        self._close_update_dialog()
         if ok:
             # The detached helper is waiting for us to exit; quitting triggers the
             # swap + relaunch.
@@ -486,6 +532,8 @@ class SpukWindow(QWidget):
             return
         self._update_btn.setEnabled(True)
         self._update_btn.setText("Check for updates")
+        if not message:  # user cancelled — no error dialog, just reset
+            return
         box = QMessageBox(self)
         box.setWindowTitle("Update failed")
         box.setText("Couldn't install the update automatically.")
