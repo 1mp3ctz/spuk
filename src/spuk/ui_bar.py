@@ -12,8 +12,6 @@ through Qt signals (queued automatically across threads).
 
 from __future__ import annotations
 
-import logging
-import os
 import threading
 
 from PySide6.QtCore import (
@@ -383,15 +381,13 @@ def run_bar(config: Config, core: SpukCore) -> None:
     core.start_input()
 
     def quit_app() -> None:
-        # Hard-exit immediately. os._exit terminates the whole process — including
-        # the pynput listener thread that otherwise keeps the pill alive after
-        # Qt's event loop ends (which is why a plain app.quit() isn't enough).
-        #
-        # We deliberately do NOT stop the listener first: tearing down the macOS
-        # CGEventTap on the way out traps (SIGTRAP → "Python quit unexpectedly").
-        # os._exit reclaims the thread regardless, so stopping it is unnecessary.
-        logging.shutdown()
-        os._exit(0)
+        # Quit cleanly: stop the Qt event loop and let the process shut down
+        # normally. The pynput listener runs on a DAEMON thread, so nothing blocks
+        # exit — and a clean shutdown (rather than a forced os._exit) lets Python
+        # release faster-whisper's multiprocessing semaphore and tear the macOS
+        # CGEventTap down in order, avoiding the "Python quit unexpectedly" trap
+        # the hard exit caused.
+        app.quit()
 
     window.set_quit(quit_app)
 
