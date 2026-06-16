@@ -16,6 +16,9 @@ models/
 # Secrets — never commit
 .env
 
+# Local-only working notes / saved chats — never push to GitHub
+tmp/
+
 # macOS
 .DS_Store
 # AppleDouble sidecar files created on exFAT/non-HFS volumes
