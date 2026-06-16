@@ -21,17 +21,25 @@ from __future__ import annotations
 import json
 import logging
 import os
-import shutil
 import subprocess
 import sys
 import tempfile
 import urllib.error
 import urllib.request
 import zipfile
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
 log = logging.getLogger("spuk.updates")
+
+# How much to read per socket chunk while downloading — small enough that the
+# progress bar moves smoothly and a Cancel is noticed within a fraction of a second.
+_CHUNK = 256 * 1024
+
+
+class UpdateCancelled(Exception):
+    """Raised when the user cancels a download in progress (not an error)."""
 
 REPO = "1mp3ctz/spuk"
 LATEST_API = f"https://api.github.com/repos/{REPO}/releases/latest"
@@ -168,11 +176,39 @@ def _installed_macos_app() -> Path | None:
     return None
 
 
-def _download_zip(url: str, dest_dir: Path, timeout: float = 180.0) -> Path:
+def _download_zip(
+    url: str,
+    dest_dir: Path,
+    timeout: float = 180.0,
+    progress: Callable[[int, int], None] | None = None,
+    cancel: Callable[[], bool] | None = None,
+) -> Path:
+    """Stream the release zip to disk.
+
+    ``progress(downloaded_bytes, total_bytes)`` is called as data arrives so the
+    UI can show a real progress bar instead of a frozen-looking spinner (total is
+    0 when the server omits Content-Length). ``cancel()`` is polled between chunks;
+    returning True aborts with ``UpdateCancelled`` so the user can back out of a
+    large download. Raises on network errors so the caller can fall back.
+    """
     request = urllib.request.Request(url, headers={"User-Agent": "Spuk-updater"})
     zip_path = dest_dir / "update.zip"
-    with urllib.request.urlopen(request, timeout=timeout) as response, open(zip_path, "wb") as out:
-        shutil.copyfileobj(response, out)
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        total = int(response.headers.get("Content-Length") or 0)
+        done = 0
+        if progress is not None:
+            progress(done, total)
+        with open(zip_path, "wb") as out:
+            while True:
+                if cancel is not None and cancel():
+                    raise UpdateCancelled("Update cancelled.")
+                chunk = response.read(_CHUNK)
+                if not chunk:
+                    break
+                out.write(chunk)
+                done += len(chunk)
+                if progress is not None:
+                    progress(done, total)
     return zip_path
 
 
@@ -217,12 +253,18 @@ def _apply_windows(extract_dir: Path) -> None:
     subprocess.Popen(["cmd", "/c", str(bat)], creationflags=DETACHED_PROCESS, close_fds=True)
 
 
-def self_update(asset_url: str | None) -> None:
+def self_update(
+    asset_url: str | None,
+    progress: Callable[[int, int], None] | None = None,
+    cancel: Callable[[], bool] | None = None,
+) -> None:
     """Download this platform's release asset and stage an in-place swap + relaunch.
 
     Spawns a detached helper that waits for THIS process to exit, replaces the
     installed app, and relaunches it. The caller must quit Spuk immediately after
-    this returns. Raises on any failure so the UI can fall back to the browser.
+    this returns. ``progress`` / ``cancel`` are forwarded to the download so the UI
+    can show a progress bar and let the user back out. Raises on any failure (and
+    ``UpdateCancelled`` on cancel) so the UI can react accordingly.
     """
     if not asset_url:
         raise RuntimeError("No download is available for this platform.")
@@ -232,7 +274,7 @@ def self_update(asset_url: str | None) -> None:
     tmp = Path(tempfile.mkdtemp(prefix="spuk-update-"))
     extract_dir = tmp / "extracted"
     extract_dir.mkdir()
-    zip_path = _download_zip(asset_url, tmp)
+    zip_path = _download_zip(asset_url, tmp, progress=progress, cancel=cancel)
     with zipfile.ZipFile(zip_path) as archive:
         archive.extractall(extract_dir)
 
