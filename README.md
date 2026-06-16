@@ -248,9 +248,13 @@ the same way as the first time (`sudo apt install ./spuk_*.deb` / `sudo dnf inst
   "Talk" or "Switch language", and **press the keys you want** — that combo becomes your
   new shortcut right away. Pick **hold-to-talk** or **press-to-toggle**, and there's
   always **Reset hotkeys to default** to get the originals back. Your choices are
-  remembered between restarts. **Dictating into a terminal** (e.g. VS Code / Cursor)?
-  Set **"Paste with: Terminal (Ctrl+Shift+V)"** in the same panel — terminals don't
-  treat plain Ctrl+V as paste. *(You can still edit `config.toml` by hand if you prefer.)*
+  remembered between restarts. **Dictating into a terminal?** Use the **"Paste with:"**
+  dropdown in the same panel:
+    - **Terminal (Ctrl+Shift+V)** for modern terminals (VS Code / Cursor, Windows Terminal) —
+      plain Ctrl+V isn't "paste" there.
+    - **Type it out** for the **classic Windows console** (`cmd.exe`), which has *no* paste
+      shortcut at all (paste is right-click only). This types the text in directly, so it
+      lands in any app — and it's umlaut-safe. *(You can still edit `config.toml` by hand if you prefer.)*
 - **Add a language:** click the **⚙ gear** on the pill (or the menu-bar ghost →
   **Settings…**) to open Settings, then use **"Add a language…"** to pick from the
   ~100 the speech model supports. Your chosen languages appear as quick-switch buttons
