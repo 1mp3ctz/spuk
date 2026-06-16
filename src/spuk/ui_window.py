@@ -19,8 +19,9 @@ import logging
 import threading
 import webbrowser
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QCompleter,
     QFrame,
@@ -36,8 +37,9 @@ from PySide6.QtWidgets import (
 from . import __version__, updates
 from .config import Config
 from .core import SpukCore
+from .hotkey_format import combo_to_label, validate_combo
 from .languages import all_languages
-from .ui_bar import CoreSignals, _is_mac, _lang_label
+from .ui_bar import CoreSignals, _lang_label
 
 log = logging.getLogger("spuk.window")
 
@@ -61,7 +63,7 @@ class SpukWindow(QWidget):
         self._core = core
         self._quit = None  # set by run_bar
         self.setWindowTitle("Spuk — Settings")
-        self.setFixedSize(400, 600)
+        self.setFixedSize(400, 720)
         self._build_ui()
         self._wire(signals)
 
@@ -102,11 +104,9 @@ class SpukWindow(QWidget):
         top.addWidget(self._live, 0, Qt.AlignVCenter)
         c.addLayout(top)
 
-        # Shortcut (informational).
-        combo = "⌃ Ctrl    ⌥ Option" if _is_mac() else "Ctrl    Alt"
-        key = QLabel(f"{combo}        Hold & speak")
-        key.setObjectName("key")
-        c.addWidget(key)
+        # --- Hotkeys ---
+        c.addWidget(_section("Hotkeys"))
+        c.addWidget(self._build_hotkeys())
 
         # --- Languages ---
         c.addWidget(_section("My languages"))
@@ -225,6 +225,138 @@ class SpukWindow(QWidget):
             self._langlist.addWidget(row)
         self._langlist.addStretch(1)
 
+    # --- hotkeys ---------------------------------------------------------
+
+    def _build_hotkeys(self) -> QWidget:
+        box = QWidget()
+        v = QVBoxLayout(box)
+        v.setContentsMargins(0, 0, 0, 0)
+        v.setSpacing(8)
+
+        hk = self._core.hotkey
+        self._capturing_which = None
+        self._capture_timer = QTimer(self)
+        self._capture_timer.setSingleShot(True)
+        self._capture_timer.setInterval(8000)
+        self._capture_timer.timeout.connect(self._capture_timeout)
+
+        self._talk_btn = self._combo_row(v, "Talk", hk.key, self._capture_talk)
+        self._cycle_btn = self._combo_row(v, "Switch language", hk.cycle_language, self._capture_cycle)
+
+        # Hold-to-talk vs press-to-toggle.
+        self._mode = QComboBox()
+        self._mode.setObjectName("mic")  # reuse the combo styling
+        self._mode.addItem("Hold to talk", "push_to_talk")
+        self._mode.addItem("Press to toggle", "toggle")
+        self._mode.setCurrentIndex(0 if hk.mode == "push_to_talk" else 1)
+        self._mode.currentIndexChanged.connect(self._mode_changed)
+        v.addWidget(self._mode)
+
+        # Hands-free double-tap (push_to_talk only).
+        self._handsfree = QCheckBox("Double-tap to record hands-free")
+        self._handsfree.setObjectName("handsfree")
+        self._handsfree.setChecked(hk.handsfree)
+        self._handsfree.setEnabled(hk.mode == "push_to_talk")
+        self._handsfree.stateChanged.connect(self._handsfree_changed)
+        v.addWidget(self._handsfree)
+
+        # Inline validation / status message.
+        self._hk_msg = QLabel("")
+        self._hk_msg.setObjectName("priv")
+        self._hk_msg.setWordWrap(True)
+        v.addWidget(self._hk_msg)
+
+        reset = QPushButton("Reset hotkeys to default")
+        reset.setObjectName("update")
+        reset.setCursor(Qt.PointingHandCursor)
+        reset.clicked.connect(self._reset_hotkeys)
+        v.addWidget(reset)
+        return box
+
+    def _combo_row(self, parent_layout, label: str, combo: str, on_change) -> QPushButton:
+        row = QHBoxLayout()
+        name = QLabel(label)
+        name.setObjectName("priv")
+        btn = QPushButton(combo_to_label(combo))
+        btn.setObjectName("update")
+        btn.setCursor(Qt.PointingHandCursor)
+        btn.clicked.connect(on_change)
+        row.addWidget(name, 1)
+        row.addWidget(btn)
+        parent_layout.addLayout(row)
+        return btn
+
+    def _capture_talk(self) -> None:
+        self._start_capture("talk", self._talk_btn)
+
+    def _capture_cycle(self) -> None:
+        self._start_capture("cycle", self._cycle_btn)
+
+    def _start_capture(self, which: str, btn: QPushButton) -> None:
+        self._capturing_which = which
+        btn.setText("⌨  Press your keys…")
+        self._hk_msg.setText("")
+        if self._core.start_capture(self._core.on_combo_captured):
+            self._capture_timer.start()
+        else:
+            self._capturing_which = None
+            self._refresh_hotkey_labels()
+            self._hk_msg.setText("Hotkey backend not ready — try again in a moment.")
+
+    def _capture_timeout(self) -> None:
+        if self._capturing_which is None:
+            return
+        self._capturing_which = None
+        self._core.cancel_capture()
+        self._refresh_hotkey_labels()
+        self._hk_msg.setText("No keys detected — cancelled.")
+
+    def _on_combo_captured(self, combo: str) -> None:
+        self._capture_timer.stop()
+        which = self._capturing_which
+        if which is None:
+            return
+        self._capturing_which = None
+        hk = self._core.hotkey
+        other = hk.cycle_language if which == "talk" else hk.key
+        ok, msg = validate_combo(combo, mode=hk.mode, other_combo=other)
+        if not ok:
+            self._hk_msg.setText("⚠  " + msg)
+            self._refresh_hotkey_labels()  # restore the button label
+            return
+        self._hk_msg.setText(msg or "")   # non-blocking warning, if any
+        if which == "talk":
+            self._core.rebind_hotkeys(key=combo)
+        else:
+            self._core.rebind_hotkeys(cycle_language=combo)
+        # labels refresh via the hotkey_changed signal
+
+    def _mode_changed(self, _i: int) -> None:
+        mode = self._mode.currentData()
+        self._handsfree.setEnabled(mode == "push_to_talk")
+        self._core.rebind_hotkeys(mode=mode)
+
+    def _handsfree_changed(self, _state: int) -> None:
+        self._core.rebind_hotkeys(handsfree=self._handsfree.isChecked())
+
+    def _reset_hotkeys(self) -> None:
+        self._core.reset_hotkeys()
+        self._hk_msg.setText("Reset to defaults.")
+        # labels refresh via the hotkey_changed signal
+
+    def _refresh_hotkey_labels(self) -> None:
+        hk = self._core.hotkey
+        self._talk_btn.setText(combo_to_label(hk.key))
+        self._cycle_btn.setText(combo_to_label(hk.cycle_language))
+        # Block signals so programmatic updates don't re-trigger a rebind.
+        self._mode.blockSignals(True)
+        self._mode.setCurrentIndex(0 if hk.mode == "push_to_talk" else 1)
+        self._mode.blockSignals(False)
+        self._handsfree.blockSignals(True)
+        self._handsfree.setChecked(hk.handsfree)
+        self._handsfree.setEnabled(hk.mode == "push_to_talk")
+        self._handsfree.blockSignals(False)
+
     # --- core wiring -----------------------------------------------------
 
     def _wire(self, signals: CoreSignals) -> None:
@@ -232,6 +364,8 @@ class SpukWindow(QWidget):
         signals.language.connect(lambda _l: self._rebuild_langs())
         signals.languages.connect(lambda _c: self._rebuild_langs())
         signals.ready.connect(lambda: self._set_live("Ready", READY_DOT))
+        signals.combo_captured.connect(self._on_combo_captured)
+        signals.hotkey_changed.connect(self._refresh_hotkey_labels)
 
     def _set_live(self, text: str, dot: str) -> None:
         self._live.setText(f'<span style="color:{dot}">●</span> {text}')
@@ -422,6 +556,8 @@ QComboBox#add QAbstractItemView, QComboBox#mic QAbstractItemView {
     background: #4c1d95; color: #ffffff; selection-background-color: #7c3aed;
 }
 #priv { color: rgba(255, 255, 255, 0.82); font-size: 12px; }
+QCheckBox#handsfree { color: rgba(255, 255, 255, 0.88); font-size: 13px; spacing: 8px; }
+QCheckBox#handsfree:disabled { color: rgba(255, 255, 255, 0.4); }
 #ver { color: rgba(255, 255, 255, 0.6); font-size: 11px; }
 QPushButton#update {
     color: #ffffff; font-size: 13px; font-weight: 600;
