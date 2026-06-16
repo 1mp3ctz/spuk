@@ -40,6 +40,7 @@ from PySide6.QtWidgets import (
 
 from .config import Config
 from .core import SpukCore
+from .hotkey_format import combo_to_label
 from .languages import display_name
 
 # Native display names for the three first-class languages; anything else falls
@@ -64,6 +65,8 @@ class CoreSignals(QObject):
     languages = Signal(tuple)  # the curated set changed (add/remove)
     transcript = Signal(str)
     ready = Signal()
+    combo_captured = Signal(str)   # a Settings hotkey capture finished
+    hotkey_changed = Signal()      # bindings changed -> refresh labels
 
 
 class SpukBar(QWidget):
@@ -140,8 +143,7 @@ class SpukBar(QWidget):
         self._rebuild_langs()
         card.addLayout(self._lang_row)
 
-        mod = "⌃⌥" if _is_mac() else "Ctrl+Alt"
-        self._hint = QLabel(f"Hold {mod} to dictate · ⚙ for languages & settings")
+        self._hint = QLabel(self._hint_text())
         self._hint.setStyleSheet("color:rgba(255,255,255,0.8); font-size:11px;")
         card.addWidget(self._hint)
 
@@ -212,6 +214,7 @@ class SpukBar(QWidget):
         self._sig.language.connect(self._on_language)
         self._sig.languages.connect(lambda _codes: self._rebuild_langs())
         self._sig.ready.connect(lambda: self._status.setText("ready"))
+        self._sig.hotkey_changed.connect(self._on_hotkey_changed)
 
     def _on_recording(self, active: bool) -> None:
         self._dot.setStyleSheet(
@@ -223,6 +226,13 @@ class SpukBar(QWidget):
         self._lang_code.setText(lang.upper())
         for code, b in self._lang_buttons.items():
             b.setChecked(code == lang)
+
+    def _hint_text(self) -> str:
+        verb = "Hold" if self._core.hotkey.mode == "push_to_talk" else "Press"
+        return f"{verb} {combo_to_label(self._core.hotkey.key)} to dictate · ⚙ for settings"
+
+    def _on_hotkey_changed(self) -> None:
+        self._hint.setText(self._hint_text())
 
     def _dictate_released(self) -> None:
         # Transcribe+paste blocks ~1s — keep it off the UI thread.
@@ -353,6 +363,8 @@ def run_bar(config: Config, core: SpukCore) -> None:
     core.on_language_change = signals.language.emit
     core.on_languages_change = signals.languages.emit
     core.on_transcript = signals.transcript.emit
+    core.on_combo_captured = signals.combo_captured.emit
+    core.on_hotkey_change = signals.hotkey_changed.emit
 
     # The floating pill is the primary, always-on UI.
     bar = SpukBar(config, core, signals)
@@ -365,9 +377,10 @@ def run_bar(config: Config, core: SpukCore) -> None:
     window = SpukWindow(config, core, signals)
     bar.set_open_window(window.present)
 
-    # Start the global hotkey backend on a background thread (pynput on
-    # macOS/Windows, evdev on Linux; both return a handle with .stop()).
-    listener = core.make_input_backend().start()
+    # Start the global hotkey backend. Core owns the handle (pynput on
+    # macOS/Windows, evdev on Linux) so it can swap it live when the user
+    # changes a hotkey in Settings.
+    core.start_input()
 
     def quit_app() -> None:
         # Fully terminate Spuk from either the pill's ⚙ → Quit or the menu bar.
@@ -378,8 +391,7 @@ def run_bar(config: Config, core: SpukCore) -> None:
         # stop the listener, end the Qt loop, and then hard-exit to guarantee the
         # whole app (pill included) actually goes away on both macOS and Windows.
         try:
-            if listener is not None:
-                listener.stop()
+            core.stop_input()
         except Exception:  # noqa: BLE001 — never let a teardown error block quit
             pass
         app.quit()

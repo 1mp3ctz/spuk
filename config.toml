@@ -12,6 +12,8 @@ compute_type     = "int8"            # fast, small footprint; good on modest har
 vad_filter       = true              # trim leading/trailing silence
 beam_size        = 1                 # greedy = lowest latency. Raise to 5 for accuracy (Phase 2).
 
+# These keys can also be changed in the app: Settings (⚙) → Hotkeys → Change.
+# Saved choices (settings.json) override the values below.
 [hotkey]
 # push_to_talk: hold to record, release to transcribe+paste (recommended default).
 # toggle: press once to start, press again to stop.

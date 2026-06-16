@@ -85,6 +85,6 @@ app = BUNDLE(
     info_plist={
         "LSUIElement": True,  # background/menu-bar app, no Dock icon
         "NSMicrophoneUsageDescription": "Spuk transcribes your speech locally.",
-        "CFBundleShortVersionString": "0.3.5",
+        "CFBundleShortVersionString": "1.0.0",
     },
 )

@@ -1,7 +1,7 @@
 [project]
 name = "spuk"
-version = "0.3.5"
-description = "Private, local, free press-to-talk dictation for macOS and Windows."
+version = "1.0.0"
+description = "Private, local, free press-to-talk dictation for macOS, Windows, and Linux."
 readme = "README.md"
 license = "MIT"
 authors = [{ name = "Viktor Kotowski" }]

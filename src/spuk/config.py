@@ -104,6 +104,33 @@ def _overlay_user_languages(t: dict) -> None:
         t["default_language"] = t["languages"][0] if t["languages"] else t.get("default_language")
 
 
+def _overlay_user_hotkey(h: dict) -> None:
+    """Overlay the user's saved hotkey choices (settings.json) onto the defaults.
+
+    Mutates ``h`` in place. Ignores missing/blank/invalid values so a partial or
+    absent settings.json simply leaves the bundled config.toml defaults in place.
+    """
+    from .settings_store import load_user_settings
+
+    user = load_user_settings()
+
+    key = user.get("hotkey_key")
+    if isinstance(key, str) and key.strip():
+        h["key"] = key
+
+    cycle = user.get("hotkey_cycle_language")
+    if isinstance(cycle, str) and cycle.strip():
+        h["cycle_language"] = cycle
+
+    mode = user.get("hotkey_mode")
+    if mode in ("push_to_talk", "toggle"):
+        h["mode"] = mode
+
+    handsfree = user.get("hotkey_handsfree")
+    if isinstance(handsfree, bool):
+        h["handsfree"] = handsfree
+
+
 def load_config(path: Path | None = None) -> Config:
     """Load and validate the TOML config. Raises with a clear message on error."""
     cfg_path = path or DEFAULT_CONFIG_PATH
@@ -118,7 +145,9 @@ def load_config(path: Path | None = None) -> Config:
         t["languages"] = tuple(t.get("languages", []))  # list -> immutable tuple
         _overlay_user_languages(t)
         transcribe = TranscribeConfig(**t)
-        hotkey = HotkeyConfig(**raw["hotkey"])
+        h = dict(raw["hotkey"])
+        _overlay_user_hotkey(h)
+        hotkey = HotkeyConfig(**h)
         audio = AudioConfig(**raw["audio"])
         post_process = PostProcessConfig(**raw["post_process"])
     except (KeyError, TypeError) as exc:
