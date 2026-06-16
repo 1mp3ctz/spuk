@@ -209,6 +209,32 @@ offline and free afterwards, exactly like on Mac and Windows.
 
 ---
 
+## 🔄 Updating Spuk
+
+Spuk updates itself **from inside the app** — no hunting down the download page or
+copying files by hand.
+
+1. Open **Settings** (the ⚙ gear on the pill, or the menu-bar ghost → **Settings…**).
+2. Click **"Check for updates."** If a newer version exists, choose **Update now**.
+3. Spuk downloads the new version — **~120 MB on Mac, ~190 MB on Windows** — showing a
+   **progress bar** *(added in v1.0.2)*, then replaces itself and **restarts
+   automatically**. It's a biggish download, so give it a moment; you can **Cancel** any time.
+
+> 🍎 **Mac only:** when it restarts, macOS will ask you to re-grant the three
+> permissions (**Microphone**, **Accessibility**, **Input Monitoring**) — it sees the
+> new version as a "different" app. Same quick toggles, just once per update.
+> **Windows keeps its setup** across updates, no re-granting.
+
+**🐧 Linux** updates through your **package manager** instead — download the new
+`.deb`/`.rpm` from [Releases](https://github.com/1mp3ctz/spuk/releases) and install it
+the same way as the first time (`sudo apt install ./spuk_*.deb` / `sudo dnf install
+./spuk-*.rpm`). The in-app button intentionally doesn't touch package-managed files.
+
+> Running Spuk **from source**? The in-app updater is off — it just opens the Releases
+> page so you can `git pull` / reinstall yourself.
+
+---
+
 ## 🎛️ How to use it
 
 - **Dictate (hold):** click into any text field, **hold the hotkey, speak, release.**
@@ -232,11 +258,8 @@ offline and free afterwards, exactly like on Mac and Windows.
 - **The hover bar:** move your mouse over the little pill at the bottom of the screen.
   It expands to show **your languages, hold-to-talk, and the shortcuts**, plus the
   **⚙ gear** for Settings (languages & microphone).
-- **Check for updates:** open **Settings** (⚙ gear or menu-bar ghost → **Settings…**)
-  and click **"Check for updates"**. If a newer version exists, the installed app can
-  **download and install it for you in one click** — it replaces itself and restarts
-  automatically, no re-downloading by hand. (When you run Spuk from source it just opens
-  the download page instead.)
+- **Check for updates:** **Settings → "Check for updates"** updates the app in one click —
+  see [Updating Spuk](#-updating-spuk) above for the full flow.
 - **Quit Spuk:** click the little **ghost icon in the menu bar** (top-right of the
   screen on Mac, system tray on Windows) and choose **Quit Spuk** — or use **Quit Spuk**
   in Settings. Either fully closes the app (pill included).
