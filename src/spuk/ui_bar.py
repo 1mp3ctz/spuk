@@ -20,6 +20,7 @@ from PySide6.QtCore import (
     QPropertyAnimation,
     QRect,
     Qt,
+    QThread,
     QTimer,
     Signal,
 )
@@ -65,6 +66,48 @@ class CoreSignals(QObject):
     ready = Signal()
     combo_captured = Signal(str)   # a Settings hotkey capture finished
     hotkey_changed = Signal()      # bindings changed -> refresh labels
+
+
+class _MainThreadRunner(QObject):
+    """Run a callable on the Qt main thread, blocking the caller until it finishes.
+
+    macOS requires pynput's keyboard injection (it queries the keyboard layout via
+    HIToolbox's Text Input Source Manager) to run on the main thread; calling it
+    from the hotkey-listener thread or the UI's "Hold to talk" worker trips a
+    main-queue assertion and the process dies with SIGTRAP. paste.py calls
+    :meth:`run` to marshal that injection here. This object lives on the main
+    thread, so its queued slot executes there even when emit() comes from a worker.
+    """
+
+    _submit = Signal(object)  # carries (fn, result-dict, done-event)
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._submit.connect(self._run_job)  # auto-queued across threads
+
+    def _run_job(self, job) -> None:
+        fn, result, done = job
+        try:
+            result["value"] = fn()
+        except BaseException as exc:  # noqa: BLE001 - surfaced to the caller
+            result["error"] = exc
+        finally:
+            done.set()
+
+    def run(self, fn):
+        """Execute ``fn`` on the main thread; return its result (re-raising on error)."""
+        if QThread.currentThread() is self.thread():
+            return fn()  # already on the main thread — don't deadlock on done.wait()
+        result: dict = {}
+        done = threading.Event()
+        self._submit.emit((fn, result, done))
+        # Bounded wait: if the event loop has stopped (e.g. mid-quit) the daemon
+        # worker must not hang forever — the paste is simply dropped.
+        if not done.wait(timeout=10.0):
+            raise RuntimeError("main-thread paste timed out")
+        if "error" in result:
+            raise result["error"]
+        return result.get("value")
 
 
 class SpukBar(QWidget):
@@ -353,6 +396,19 @@ def _install_menubar(app, on_open, on_quit) -> "QSystemTrayIcon | None":
 def run_bar(config: Config, core: SpukCore) -> None:
     app = QApplication.instance() or QApplication([])
     app.setQuitOnLastWindowClosed(False)
+
+    # macOS: route pynput's keyboard injection through the main thread. pynput
+    # touches the main-thread-only Text Input Source Manager, so injecting the
+    # paste keystroke from the hotkey-listener / UI worker thread crashes the
+    # process with SIGTRAP. Installed before the hotkey backend starts so the very
+    # first dictation is safe. No-op elsewhere (Windows/Linux don't need it).
+    import platform
+
+    if platform.system() == "Darwin":
+        from .paste import set_main_thread_runner
+
+        app._spuk_main_runner = _MainThreadRunner()  # type: ignore[attr-defined]  # strong ref
+        set_main_thread_runner(app._spuk_main_runner.run)  # type: ignore[attr-defined]
 
     # One shared signal bus: the core fires these (from the hotkey thread) and
     # both the floating bar and the main window listen on them.

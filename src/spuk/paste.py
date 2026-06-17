@@ -60,6 +60,35 @@ _paste_mode: str = "shortcut"  # "shortcut" (clipboard + key combo) or "type"
 Typer = Callable[[str], None]
 _typer: Typer | None = None
 
+# macOS only: pynput's keyboard Controller queries the current keyboard layout
+# through HIToolbox's Text Input Source Manager, which ASSERTS it runs on the main
+# thread (dispatch_assert_queue). Spuk synthesizes the paste keystroke from the
+# hotkey-listener thread and from the UI's "Hold to talk" worker thread, so without
+# marshalling that pynput work onto the main thread the process dies with SIGTRAP.
+# The Qt app installs a runner here (see ui_bar._MainThreadRunner); headless /
+# Windows / Linux leave it None, so injection runs inline exactly as before.
+MainThreadRunner = Callable[[Callable[[], object]], object]
+_main_thread_runner: MainThreadRunner | None = None
+
+
+def set_main_thread_runner(runner: MainThreadRunner | None) -> None:
+    """Install (or clear) the callable used to run keyboard injection on the main thread.
+
+    ``runner(fn)`` must execute ``fn`` on the main thread and block until it
+    returns (propagating its return value and any exception), and must run ``fn``
+    inline if already on the main thread.
+    """
+    global _main_thread_runner
+    _main_thread_runner = runner
+
+
+def _run_on_main(fn: Callable[[], object]) -> object:
+    """Run ``fn`` on the main thread if a runner is installed, else inline."""
+    runner = _main_thread_runner
+    if runner is None:
+        return fn()
+    return runner(fn)
+
 
 class TypingUnavailable(Exception):
     """The platform can't type here (e.g. no ydotool on Linux) → fall back to paste."""
@@ -96,17 +125,28 @@ def _build_pynput_injector(combo: str | None) -> PasteInjector:
     """macOS/Windows injector: synthesize the paste combo via pynput.
 
     Imported and constructed lazily so Linux never builds a pynput Controller.
+    Parsing the combo is layout-free and safe off the main thread, but the
+    Controller (its build AND the key events) touches the macOS main-thread-only
+    Text Input Source Manager, so both are deferred into ``_run_on_main``.
     """
-    from pynput.keyboard import Controller, HotKey
+    from pynput.keyboard import HotKey
 
-    keyboard = Controller()
     keys = HotKey.parse(_resolve_combo(combo))  # e.g. [Key.ctrl, Key.shift, KeyCode('v')]
+    state: dict = {}  # caches the Controller, built on the main thread on first use
 
     def send_paste() -> None:
-        for k in keys:
-            keyboard.press(k)
-        for k in reversed(keys):
-            keyboard.release(k)
+        def do() -> None:
+            from pynput.keyboard import Controller
+
+            keyboard = state.get("kb")
+            if keyboard is None:
+                keyboard = state["kb"] = Controller()
+            for k in keys:
+                keyboard.press(k)
+            for k in reversed(keys):
+                keyboard.release(k)
+
+        _run_on_main(do)
 
     return send_paste
 
@@ -192,13 +232,23 @@ def _build_windows_typer() -> Typer:
 
 
 def _build_pynput_typer() -> Typer:
-    """macOS typer: pynput's Controller.type, which injects Unicode (umlaut-safe)."""
-    from pynput.keyboard import Controller
+    """macOS typer: pynput's Controller.type, which injects Unicode (umlaut-safe).
 
-    keyboard = Controller()
+    Like the injector, the Controller build and the typing both hit the macOS
+    main-thread-only Text Input Source Manager, so they run via ``_run_on_main``.
+    """
+    state: dict = {}  # caches the Controller, built on the main thread on first use
 
     def typer(text: str) -> None:
-        keyboard.type(text)
+        def do() -> None:
+            from pynput.keyboard import Controller
+
+            keyboard = state.get("kb")
+            if keyboard is None:
+                keyboard = state["kb"] = Controller()
+            keyboard.type(text)
+
+        _run_on_main(do)
 
     return typer
 
