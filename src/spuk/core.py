@@ -339,6 +339,25 @@ class SpukCore:
         """Public entry to stop + transcribe + paste. Blocks ~1s — call off the UI thread."""
         self._on_stop()
 
+    @property
+    def is_recording(self) -> bool:
+        return self._recorder.is_recording
+
+    def force_stop(self) -> None:
+        """Guaranteed 'stop the mic now' for the UI (menu bar / clicking the pill).
+
+        First clears any wedged hotkey state — macOS can drop a modifier key-up and
+        leave the chord stuck 'down', which would otherwise keep the recorder
+        running with no way to stop it from the keyboard. Then stops + transcribes +
+        pastes whatever was captured, exactly like releasing the hotkey. A no-op
+        when nothing is recording. Blocks ~1s on transcription — call off the UI
+        thread.
+        """
+        if self._listener is not None:
+            self._listener.reset_state()
+        if self._recorder.is_recording:
+            self._on_stop()
+
     # --- hotkey callbacks -------------------------------------------------
 
     def _on_start(self) -> None:

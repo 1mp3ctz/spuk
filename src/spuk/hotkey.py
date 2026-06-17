@@ -32,6 +32,28 @@ def _noop() -> None:
     pass
 
 
+# Modifier keys never auto-repeat at the OS level, so a key-DOWN for one we still
+# believe is held can only mean its key-UP was dropped (common on macOS when focus
+# shifts or the event tap briefly stalls). We use that to self-heal a desynced
+# chord. Non-modifier keys DO auto-repeat, so they are deliberately excluded — a
+# repeated letter key-down is auto-repeat, not a missed release.
+_MODIFIER_KEYS = frozenset(
+    k
+    for name in (
+        "ctrl", "ctrl_l", "ctrl_r",
+        "alt", "alt_l", "alt_r", "alt_gr",
+        "shift", "shift_l", "shift_r",
+        "cmd", "cmd_l", "cmd_r",
+    )
+    if (k := getattr(keyboard.Key, name, None)) is not None
+)
+
+
+def _is_modifier(key) -> bool:
+    """True if ``key`` is a modifier (which never auto-repeats its key-down)."""
+    return key in _MODIFIER_KEYS
+
+
 class HotkeyListener:
     """Watches a primary hotkey (push-to-talk / toggle) and optional tap hotkeys."""
 
@@ -110,6 +132,15 @@ class HotkeyListener:
         if self._capturing:
             self._capture_press(key)
             return
+        # Self-heal a dropped key-UP: a modifier can't repeat its key-DOWN without
+        # an intervening release, so seeing one we still hold means macOS dropped
+        # the release and our chord state is stale. Quietly forget the stale hold
+        # (no callbacks) so the press below re-arms a single clean chord edge —
+        # otherwise the chord stays wedged "down" and can never be stopped again.
+        if key in self._pressed and _is_modifier(key):
+            self._pressed.discard(key)
+            if self._chord_down and not self._satisfied(self._expected):
+                self._chord_down = False
         self._pressed.add(key)
         self._fire_taps()
         if self._satisfied(self._expected) and not self._chord_down:
@@ -188,6 +219,17 @@ class HotkeyListener:
             {"keys": set(keyboard.HotKey.parse(combo)), "cb": cb, "fired": False}
             for combo, cb in (taps or {}).items()
         ]
+        self.reset_state()
+
+    def reset_state(self) -> None:
+        """Forget all transient key/chord state, returning to a clean slate.
+
+        Clears the pressed-key set and every chord/tap latch (but NOT the bindings
+        themselves). The UI calls this as an escape hatch to un-wedge a listener
+        whose chord got stuck "down" after macOS dropped a modifier release. Field
+        reassignment is atomic in CPython, so it's safe to call from the UI thread
+        while the listener thread may be reading.
+        """
         self._pressed = set()
         self._chord_down = False
         self._recording = False
@@ -195,6 +237,9 @@ class HotkeyListener:
         self._toggle_on = False
         self._pending_double = False
         self._ignore_release = False
+        self._last_tap_time = float("-inf")
+        for tap in self._taps:
+            tap["fired"] = False
 
     # --- pynput plumbing -------------------------------------------------
 
