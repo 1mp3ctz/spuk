@@ -117,6 +117,7 @@ class SpukBar(QWidget):
         self._core = core
         self._sig = signals
         self._expanded = False
+        self._recording = False  # tracks core recording state so a click can stop it
         self._open_window = None  # set by run_bar; clicking the pill opens the window
 
         self.setWindowFlags(
@@ -258,10 +259,13 @@ class SpukBar(QWidget):
         self._sig.hotkey_changed.connect(self._on_hotkey_changed)
 
     def _on_recording(self, active: bool) -> None:
+        self._recording = active
         self._dot.setStyleSheet(
             f"color:{'#fca5a5' if active else '#86efac'}; font-size:14px;"
         )
-        self._status.setText("recording…" if active else "ready")
+        # While recording, the pill doubles as a Stop button (see _on_pill_clicked).
+        self._status.setText("recording… (click to stop)" if active else "ready")
+        self.setCursor(Qt.PointingHandCursor if active else Qt.ArrowCursor)
 
     def _on_language(self, lang: str) -> None:
         self._lang_code.setText(lang.upper())
@@ -278,6 +282,21 @@ class SpukBar(QWidget):
     def _dictate_released(self) -> None:
         # Transcribe+paste blocks ~1s — keep it off the UI thread.
         threading.Thread(target=self._core.finish_recording, daemon=True).start()
+
+    def _on_pill_clicked(self) -> None:
+        """Clicking the always-visible pill stops a recording in progress — the
+        guaranteed escape hatch when the global hotkey can't (e.g. a hands-free
+        latch wedged by a dropped modifier release). When idle, it opens Settings.
+        """
+        if self._recording:
+            self._stop_recording()
+        else:
+            self._open_settings()
+
+    def _stop_recording(self) -> None:
+        # force_stop clears wedged hotkey state then transcribes+pastes; it can
+        # block ~1s, so keep it off the UI thread.
+        threading.Thread(target=self._core.force_stop, daemon=True).start()
 
     # --- open the settings window ---------------------------------------
 
@@ -304,6 +323,12 @@ class SpukBar(QWidget):
         anim.setEndValue(QRect(x, y, w, h))
         anim.start()
         self._anim = anim  # keep a reference so it isn't GC'd
+
+    def mousePressEvent(self, event) -> None:  # noqa: N802 (Qt naming)
+        # Clicks on child buttons (gear / Hold-to-talk / language chips) are
+        # consumed by them; this fires only for clicks on the pill background.
+        self._on_pill_clicked()
+        super().mousePressEvent(event)
 
     def enterEvent(self, event) -> None:  # noqa: N802 (Qt naming)
         self._collapse_timer.stop()
@@ -360,14 +385,17 @@ def _menubar_icon() -> QIcon:
     return QIcon(pm)
 
 
-def _install_menubar(app, on_open, on_quit, on_permissions=None) -> "QSystemTrayIcon | None":
-    """Add a menu-bar (system-tray) icon to open Settings, the macOS Permissions
-    helper, or quit Spuk.
+def _install_menubar(app, on_open, on_quit, on_permissions=None, on_stop_recording=None) -> "QSystemTrayIcon | None":
+    """Add a menu-bar (system-tray) icon to stop a recording, open Settings, the
+    macOS Permissions helper, or quit Spuk.
 
     The pill has no window chrome and Spuk runs with no Dock icon, so this is the
-    user's way to reach Settings and to quit. ``on_permissions`` adds a
-    "Permissions…" item (macOS only) so the helper is always reachable. Returns the
-    icon (kept alive by `app`) or None if the platform has no system tray.
+    user's way to reach Settings and to quit. ``on_stop_recording`` adds an
+    always-available "Stop recording" item — a hotkey-independent way to shut the
+    mic off if a hands-free recording can't be stopped from the keyboard.
+    ``on_permissions`` adds a "Permissions…" item (macOS only) so the helper is
+    always reachable. Returns the icon (kept alive by `app`) or None if the
+    platform has no system tray.
     """
     if not QSystemTrayIcon.isSystemTrayAvailable():
         return None
@@ -376,6 +404,9 @@ def _install_menubar(app, on_open, on_quit, on_permissions=None) -> "QSystemTray
     header = menu.addAction("Spuk")
     header.setEnabled(False)
     menu.addSeparator()
+    if on_stop_recording is not None:
+        stop_action = menu.addAction("Stop recording")
+        stop_action.triggered.connect(lambda: on_stop_recording())
     open_action = menu.addAction("Settings…")
     open_action.triggered.connect(lambda: on_open())
     if on_permissions is not None:
@@ -452,6 +483,11 @@ def run_bar(config: Config, core: SpukCore) -> None:
 
     window.set_quit(quit_app)
 
+    def stop_recording() -> None:
+        # Always-available, hotkey-independent mic kill switch. force_stop clears
+        # any wedged hotkey state then transcribes+pastes; it can block, so thread it.
+        threading.Thread(target=core.force_stop, daemon=True).start()
+
     # macOS: a Permissions helper (deep links to the 3 Privacy panes with live
     # status). Auto-shown after an update / when a grant is missing, and always
     # reachable from the menu bar so "don't show again" is never a dead end. The
@@ -467,8 +503,9 @@ def run_bar(config: Config, core: SpukCore) -> None:
             app._spuk_perms_dialog = PermissionsDialog(on_quit=quit_app)  # type: ignore[attr-defined]
             app._spuk_perms_dialog.present()  # type: ignore[attr-defined]
 
-    # Menu-bar icon (Settings / Permissions / Quit). Held by the app so it isn't GC'd.
-    app._spuk_tray = _install_menubar(app, window.present, quit_app, open_permissions)  # type: ignore[attr-defined]
+    # Menu-bar icon (Stop recording / Settings / Permissions / Quit). Held by the
+    # app so it isn't GC'd.
+    app._spuk_tray = _install_menubar(app, window.present, quit_app, open_permissions, stop_recording)  # type: ignore[attr-defined]
     app._spuk_window = window  # type: ignore[attr-defined]  # keep a strong ref
 
     # Auto-show the permissions helper ONLY when a grant is actually missing (first
