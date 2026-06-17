@@ -146,34 +146,13 @@ def request_input_monitoring() -> bool | None:
         return None
 
 
-# --- Microphone (AVFoundation) --------------------------------------------
-
-_AV_AUTHORIZED = 3  # AVAuthorizationStatus: 0=notDetermined 1=restricted 2=denied 3=authorized
-
-
-def microphone_trusted() -> bool | None:
-    """Whether this process is authorized to capture the microphone.
-
-    True/False when macOS can tell us, None when the check is unavailable. Never
-    prompts — the mic prompt fires when capture first starts. Non-macOS → True.
-    """
-    if platform.system() != "Darwin":
-        return True
-    try:
-        from AVFoundation import AVCaptureDevice, AVMediaTypeAudio
-
-        status = AVCaptureDevice.authorizationStatusForMediaType_(AVMediaTypeAudio)
-        return status == _AV_AUTHORIZED
-    except Exception as exc:  # noqa: BLE001
-        log.debug("Could not check Microphone authorization: %s", exc)
-        return None
-
-
 # --- deep links into the macOS privacy panes ------------------------------
 
 # Anchors macOS uses for each pane under System Settings → Privacy & Security.
+# Microphone is deliberately omitted: Spuk only shows up in that pane AFTER it
+# first opens the mic, and macOS shows its own mic prompt on the first recording —
+# so a deep link there would land on a list that doesn't yet contain Spuk.
 PRIVACY_PANES = {
-    "microphone": "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone",
     "input_monitoring": "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent",
     "accessibility": "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
 }
@@ -199,9 +178,12 @@ def open_privacy_pane(name: str) -> bool:
 
 
 def permission_status() -> dict[str, bool | None]:
-    """Snapshot of the three macOS permissions Spuk needs (None = unknown)."""
+    """Snapshot of the macOS permissions Spuk's hotkey needs (None = unknown).
+
+    Microphone is intentionally excluded — see PRIVACY_PANES — it's granted via
+    macOS's own prompt on the first recording, not from this helper.
+    """
     return {
-        "microphone": microphone_trusted(),
         "input_monitoring": input_monitoring_trusted(),
         "accessibility": accessibility_trusted(prompt=False),
     }
@@ -209,22 +191,22 @@ def permission_status() -> dict[str, bool | None]:
 
 def should_show_permissions(
     *,
-    updated: bool,
     statuses: dict[str, bool | None],
     dismissed_version: str | None,
     current_version: str,
 ) -> bool:
     """Whether to auto-show the permissions window on a macOS launch.
 
-    Show when the app was just updated OR a permission is actually missing —
-    unless the user ticked "don't show again" for THIS version. A None (unknown)
-    status is NOT treated as missing, so we never nag when a check is unavailable.
-    The manual "Permissions…" menu item bypasses this entirely.
+    Show only when a permission is actually missing — unless the user ticked
+    "don't show again" for THIS version. With stable code signing the grants
+    persist across updates, so we no longer raise the window merely because the
+    version changed; only a genuinely missing grant (first run / fresh machine)
+    brings it up. A None (unknown) status is NOT treated as missing, and the
+    menu-bar "Permissions…" item opens it on demand regardless.
     """
     if dismissed_version == current_version:
         return False
-    missing = any(value is False for value in statuses.values())
-    return updated or missing
+    return any(value is False for value in statuses.values())
 
 
 # --- Linux: input-device read + uinput-write access ------------------------
