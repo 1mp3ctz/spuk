@@ -39,18 +39,32 @@ class Recorder:
             self._frames.append(indata.copy())
 
         try:
-            self._stream = sd.InputStream(
-                samplerate=self._cfg.samplerate,
-                channels=self._cfg.channels,
-                dtype="float32",
-                device=self.device,
-                callback=callback,
-            )
-            self._stream.start()
-        except Exception as exc:  # no input device, device busy, etc.
-            log.error("Could not open microphone: %s", exc)
-            self._stream = None
-            raise
+            self._open(self.device, callback)
+        except Exception as exc:  # no input device, device busy, stale index, etc.
+            # A saved device INDEX can go stale (an unplugged USB / disconnected
+            # AirPods mic), which otherwise fails silently — no recording AND no
+            # macOS mic prompt, because the mic is never actually engaged. Fall back
+            # to the system default so dictation keeps working, and forget the bad
+            # device so we don't keep retrying it.
+            if self.device is not None:
+                log.warning("Mic %r unavailable (%s) — using the default input.", self.device, exc)
+                self.device = None
+                self._open(None, callback)  # genuine no-mic error still propagates
+            else:
+                log.error("Could not open microphone: %s", exc)
+                raise
+
+    def _open(self, device, callback) -> None:
+        """Open + start an input stream on ``device`` (None = system default)."""
+        stream = sd.InputStream(
+            samplerate=self._cfg.samplerate,
+            channels=self._cfg.channels,
+            dtype="float32",
+            device=device,
+            callback=callback,
+        )
+        stream.start()
+        self._stream = stream  # only set once the stream is actually running
 
     def stop(self) -> np.ndarray:
         """Stop recording and return the captured mono audio (may be empty)."""
