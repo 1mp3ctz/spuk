@@ -22,7 +22,7 @@ def _app() -> QApplication:
 
 
 def _all(values):
-    return {"microphone": values, "input_monitoring": values, "accessibility": values}
+    return {"input_monitoring": values, "accessibility": values}
 
 
 def test_dialog_shows_status_icon_per_permission(monkeypatch):
@@ -30,12 +30,12 @@ def test_dialog_shows_status_icon_per_permission(monkeypatch):
     monkeypatch.setattr(
         permissions,
         "permission_status",
-        lambda: {"microphone": True, "input_monitoring": False, "accessibility": None},
+        lambda: {"input_monitoring": False, "accessibility": None},
     )
     dlg = ui_permissions.PermissionsDialog()
-    assert dlg._icons["microphone"].text() == "✓"
     assert dlg._icons["input_monitoring"].text() == "✕"
     assert dlg._icons["accessibility"].text() == "?"
+    assert "microphone" not in dlg._icons  # mic row removed
 
 
 def test_open_button_opens_the_matching_pane(monkeypatch):
@@ -53,10 +53,10 @@ def test_recheck_refreshes_icons(monkeypatch):
     state = {"value": _all(False)}
     monkeypatch.setattr(permissions, "permission_status", lambda: state["value"])
     dlg = ui_permissions.PermissionsDialog()
-    assert dlg._icons["microphone"].text() == "✕"
+    assert dlg._icons["input_monitoring"].text() == "✕"
     state["value"] = _all(True)
     dlg.refresh()
-    assert dlg._icons["microphone"].text() == "✓"
+    assert dlg._icons["input_monitoring"].text() == "✓"
 
 
 def test_dont_show_again_persists_and_clears_version(monkeypatch):

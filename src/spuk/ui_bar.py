@@ -460,7 +460,7 @@ def run_bar(config: Config, core: SpukCore) -> None:
     if platform.system() == "Darwin":
         from . import __version__
         from . import permissions as _perms
-        from .settings_store import load_user_settings, update_user_settings
+        from .settings_store import load_user_settings
         from .ui_permissions import PermissionsDialog
 
         def open_permissions() -> None:  # noqa: F811 - macOS-only definition
@@ -471,19 +471,18 @@ def run_bar(config: Config, core: SpukCore) -> None:
     app._spuk_tray = _install_menubar(app, window.present, quit_app, open_permissions)  # type: ignore[attr-defined]
     app._spuk_window = window  # type: ignore[attr-defined]  # keep a strong ref
 
+    # Auto-show the permissions helper ONLY when a grant is actually missing (first
+    # run / fresh machine). Stable signing keeps grants across updates, so a version
+    # bump alone no longer triggers it. Always reachable from the menu bar.
     if platform.system() == "Darwin":
         saved = load_user_settings()
         if _perms.should_show_permissions(
-            updated=saved.get("last_seen_version") != __version__,
             statuses=_perms.permission_status(),
             dismissed_version=saved.get("perm_popup_dismissed_version"),
             current_version=__version__,
         ):
             app._spuk_perms_dialog = PermissionsDialog(on_quit=quit_app)  # type: ignore[attr-defined]
             app._spuk_perms_dialog.show()  # type: ignore[attr-defined]
-        # Remember we've launched this version so the next launch isn't treated as
-        # an update (unless the version actually changes again).
-        update_user_settings(last_seen_version=__version__)
 
     # Warm the model off the UI thread so the UI appears immediately.
     def _warm() -> None:
