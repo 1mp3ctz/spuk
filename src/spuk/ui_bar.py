@@ -360,12 +360,14 @@ def _menubar_icon() -> QIcon:
     return QIcon(pm)
 
 
-def _install_menubar(app, on_open, on_quit) -> "QSystemTrayIcon | None":
-    """Add a menu-bar (system-tray) icon to open Settings or quit Spuk.
+def _install_menubar(app, on_open, on_quit, on_permissions=None) -> "QSystemTrayIcon | None":
+    """Add a menu-bar (system-tray) icon to open Settings, the macOS Permissions
+    helper, or quit Spuk.
 
     The pill has no window chrome and Spuk runs with no Dock icon, so this is the
-    user's way to reach Settings and to quit. Returns the icon (kept alive by
-    `app`) or None if the platform has no system tray.
+    user's way to reach Settings and to quit. ``on_permissions`` adds a
+    "Permissions…" item (macOS only) so the helper is always reachable. Returns the
+    icon (kept alive by `app`) or None if the platform has no system tray.
     """
     if not QSystemTrayIcon.isSystemTrayAvailable():
         return None
@@ -376,6 +378,9 @@ def _install_menubar(app, on_open, on_quit) -> "QSystemTrayIcon | None":
     menu.addSeparator()
     open_action = menu.addAction("Settings…")
     open_action.triggered.connect(lambda: on_open())
+    if on_permissions is not None:
+        perms_action = menu.addAction("Permissions…")
+        perms_action.triggered.connect(lambda: on_permissions())
     menu.addSeparator()
     quit_action = menu.addAction("Quit Spuk")
     quit_action.triggered.connect(lambda: on_quit())
@@ -447,9 +452,38 @@ def run_bar(config: Config, core: SpukCore) -> None:
 
     window.set_quit(quit_app)
 
-    # Menu-bar icon (Settings / Quit). Held by the QApplication so it isn't GC'd.
-    app._spuk_tray = _install_menubar(app, window.present, quit_app)  # type: ignore[attr-defined]
+    # macOS: a Permissions helper (deep links to the 3 Privacy panes with live
+    # status). Auto-shown after an update / when a grant is missing, and always
+    # reachable from the menu bar so "don't show again" is never a dead end. The
+    # ad-hoc signature changes every update, so macOS drops the grants each time.
+    open_permissions = None
+    if platform.system() == "Darwin":
+        from . import __version__
+        from . import permissions as _perms
+        from .settings_store import load_user_settings, update_user_settings
+        from .ui_permissions import PermissionsDialog
+
+        def open_permissions() -> None:  # noqa: F811 - macOS-only definition
+            app._spuk_perms_dialog = PermissionsDialog(on_quit=quit_app)  # type: ignore[attr-defined]
+            app._spuk_perms_dialog.present()  # type: ignore[attr-defined]
+
+    # Menu-bar icon (Settings / Permissions / Quit). Held by the app so it isn't GC'd.
+    app._spuk_tray = _install_menubar(app, window.present, quit_app, open_permissions)  # type: ignore[attr-defined]
     app._spuk_window = window  # type: ignore[attr-defined]  # keep a strong ref
+
+    if platform.system() == "Darwin":
+        saved = load_user_settings()
+        if _perms.should_show_permissions(
+            updated=saved.get("last_seen_version") != __version__,
+            statuses=_perms.permission_status(),
+            dismissed_version=saved.get("perm_popup_dismissed_version"),
+            current_version=__version__,
+        ):
+            app._spuk_perms_dialog = PermissionsDialog(on_quit=quit_app)  # type: ignore[attr-defined]
+            app._spuk_perms_dialog.show()  # type: ignore[attr-defined]
+        # Remember we've launched this version so the next launch isn't treated as
+        # an update (unless the version actually changes again).
+        update_user_settings(last_seen_version=__version__)
 
     # Warm the model off the UI thread so the UI appears immediately.
     def _warm() -> None:

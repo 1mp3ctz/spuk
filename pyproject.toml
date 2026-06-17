@@ -1,6 +1,6 @@
 [project]
 name = "spuk"
-version = "1.0.4"
+version = "1.0.5"
 description = "Private, local, free press-to-talk dictation for macOS, Windows, and Linux."
 readme = "README.md"
 license = "MIT"
@@ -20,6 +20,11 @@ dependencies = [
     # it off macOS/Windows, where it can't build (it compiles against Linux input
     # headers). Import name and PyPI distribution are both 'evdev'.
     "evdev; sys_platform == 'linux'",
+    # macOS only: read the Microphone authorization status for the Permissions
+    # helper window. pynput already pulls the other pyobjc frameworks (Quartz /
+    # ApplicationServices) transitively; AVFoundation is the one extra we need.
+    # Absence degrades gracefully (mic status shows as unknown), never crashes.
+    "pyobjc-framework-AVFoundation; sys_platform == 'darwin'",
 ]
 
 [project.scripts]
