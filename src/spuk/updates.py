@@ -176,6 +176,34 @@ def _installed_macos_app() -> Path | None:
     return None
 
 
+def relaunch_macos_app() -> bool:
+    """Quit-safe relaunch of the installed macOS app.
+
+    Stages a detached helper that waits for THIS process to exit, then reopens the
+    bundle — so the caller can quit Spuk and have it come straight back (used by
+    the permissions window, since macOS only applies a fresh grant to a newly
+    started app). Returns False when not running as a packaged ``.app`` (dev /
+    source / other OS), so the caller can fall back to a plain close. The caller
+    must quit Spuk right after this returns True.
+    """
+    if sys.platform != "darwin":
+        return False
+    app = _installed_macos_app()
+    if app is None:
+        return False
+    helper = Path(tempfile.mkdtemp(prefix="spuk-relaunch-")) / "relaunch.sh"
+    helper.write_text(
+        "#!/bin/sh\n"
+        'PID="$1"\n'
+        'while kill -0 "$PID" 2>/dev/null; do sleep 0.3; done\n'
+        "sleep 0.5\n"
+        f'open "{app}"\n'
+    )
+    helper.chmod(0o755)
+    subprocess.Popen(["/bin/sh", str(helper), str(os.getpid())], start_new_session=True)
+    return True
+
+
 def _download_zip(
     url: str,
     dest_dir: Path,

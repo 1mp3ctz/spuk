@@ -146,6 +146,87 @@ def request_input_monitoring() -> bool | None:
         return None
 
 
+# --- Microphone (AVFoundation) --------------------------------------------
+
+_AV_AUTHORIZED = 3  # AVAuthorizationStatus: 0=notDetermined 1=restricted 2=denied 3=authorized
+
+
+def microphone_trusted() -> bool | None:
+    """Whether this process is authorized to capture the microphone.
+
+    True/False when macOS can tell us, None when the check is unavailable. Never
+    prompts — the mic prompt fires when capture first starts. Non-macOS → True.
+    """
+    if platform.system() != "Darwin":
+        return True
+    try:
+        from AVFoundation import AVCaptureDevice, AVMediaTypeAudio
+
+        status = AVCaptureDevice.authorizationStatusForMediaType_(AVMediaTypeAudio)
+        return status == _AV_AUTHORIZED
+    except Exception as exc:  # noqa: BLE001
+        log.debug("Could not check Microphone authorization: %s", exc)
+        return None
+
+
+# --- deep links into the macOS privacy panes ------------------------------
+
+# Anchors macOS uses for each pane under System Settings → Privacy & Security.
+PRIVACY_PANES = {
+    "microphone": "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone",
+    "input_monitoring": "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent",
+    "accessibility": "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
+}
+
+
+def open_privacy_pane(name: str) -> bool:
+    """Open the System Settings privacy pane for ``name`` (a PRIVACY_PANES key).
+
+    Returns True if a known pane was launched. Never raises.
+    """
+    url = PRIVACY_PANES.get(name)
+    if url is None:
+        log.warning("Unknown privacy pane %r", name)
+        return False
+    import subprocess
+
+    try:
+        subprocess.run(["open", url], check=False)
+        return True
+    except Exception as exc:  # noqa: BLE001
+        log.warning("Could not open privacy pane %s: %s", name, exc)
+        return False
+
+
+def permission_status() -> dict[str, bool | None]:
+    """Snapshot of the three macOS permissions Spuk needs (None = unknown)."""
+    return {
+        "microphone": microphone_trusted(),
+        "input_monitoring": input_monitoring_trusted(),
+        "accessibility": accessibility_trusted(prompt=False),
+    }
+
+
+def should_show_permissions(
+    *,
+    updated: bool,
+    statuses: dict[str, bool | None],
+    dismissed_version: str | None,
+    current_version: str,
+) -> bool:
+    """Whether to auto-show the permissions window on a macOS launch.
+
+    Show when the app was just updated OR a permission is actually missing —
+    unless the user ticked "don't show again" for THIS version. A None (unknown)
+    status is NOT treated as missing, so we never nag when a check is unavailable.
+    The manual "Permissions…" menu item bypasses this entirely.
+    """
+    if dismissed_version == current_version:
+        return False
+    missing = any(value is False for value in statuses.values())
+    return updated or missing
+
+
 # --- Linux: input-device read + uinput-write access ------------------------
 #
 # Unlike macOS (system permission prompts), Linux access is POSIX: the user must
