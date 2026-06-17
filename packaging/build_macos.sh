@@ -22,10 +22,24 @@ UV_LINK_MODE=copy uv run --with pyinstaller pyinstaller \
 echo "==> Stripping AppleDouble sidecar files from the bundle…"
 find dist/Spuk.app -name '._*' -delete 2>/dev/null || true
 
+# Sign with our STABLE self-signed identity if it's available, else fall back to
+# ad-hoc. The stable identity gives the bundle a constant code-signing identity
+# ("certificate leaf = …"), so macOS keeps the user's Accessibility / Input
+# Monitoring / Microphone grants across every update instead of resetting them on
+# each ad-hoc rebuild. Override the identity/keychain via env for CI.
+SIGN_IDENTITY="${SPUK_SIGN_IDENTITY:-Spuk Self-Signed}"
+SIGN_KEYCHAIN="${SPUK_SIGN_KEYCHAIN:-spuk-codesign.keychain}"
+if security find-identity -v -p codesigning "$SIGN_KEYCHAIN" 2>/dev/null | grep -q "$SIGN_IDENTITY"; then
+    echo "==> Signing with stable identity: $SIGN_IDENTITY"
+    codesign --force --deep --sign "$SIGN_IDENTITY" --keychain "$SIGN_KEYCHAIN" dist/Spuk.app
+    codesign -d -r- dist/Spuk.app 2>&1 | grep -i designated || true
+else
+    echo "==> Stable identity not found — ad-hoc signing (permissions will reset on update)."
+    codesign --force --deep --sign - dist/Spuk.app
+fi
+
 echo
 echo "==> Done: dist/Spuk.app"
 echo "    First launch downloads the Whisper model (~480MB) to the user cache."
-echo "    Ad-hoc sign (runs on THIS Mac only):"
-echo "      codesign --force --deep --sign - dist/Spuk.app"
-echo "    For your parents' Macs without a paid signing cert, they must right-click"
-echo "    the app -> Open the first time (Gatekeeper). See packaging/README.md."
+echo "    First launch on each Mac still needs right-click -> Open once (Gatekeeper);"
+echo "    the stable signature keeps permission grants across later updates."

@@ -41,15 +41,45 @@ jobs:
           test -d "dist/Spuk.app" || { echo "Spuk.app not produced"; exit 1; }
           echo "Built bundle:"; du -sh dist/Spuk.app || true
 
-      - name: Ad-hoc sign (best-effort; unsigned distribution either way)
-        # No paid Apple cert in CI, so this is an ad-hoc signature only. It does NOT
-        # pass strict Gatekeeper — users still right-click -> Open on first launch.
-        # Best-effort so a signing hiccup never fails the release.
+      - name: Sign the .app (stable self-signed cert if present, else ad-hoc)
+        # A STABLE code-signing identity gives the bundle a constant Designated
+        # Requirement ("certificate leaf = …"), so macOS keeps the user's
+        # Accessibility / Input Monitoring / Microphone grants across EVERY update
+        # instead of resetting them on each rebuild (the pain of ad-hoc signing).
+        # The self-signed cert lives in repo secrets; without it we fall back to
+        # ad-hoc so a release never fails. Still unsigned to Gatekeeper either way
+        # (self-signed isn't Apple-notarised) — first launch is right-click → Open.
         continue-on-error: true
+        env:
+          SPUK_CERT_P12_BASE64: ${{ secrets.SPUK_CERT_P12_BASE64 }}
+          SPUK_CERT_PASSWORD: ${{ secrets.SPUK_CERT_PASSWORD }}
+          SPUK_KEYCHAIN_PASSWORD: ${{ secrets.SPUK_KEYCHAIN_PASSWORD }}
         run: |
+          set -e
           find dist/Spuk.app -exec xattr -d com.apple.FinderInfo {} \; 2>/dev/null || true
           xattr -cr dist/Spuk.app || true
-          codesign --force --deep --sign - dist/Spuk.app || true
+          if [ -z "${SPUK_CERT_P12_BASE64:-}" ]; then
+            echo "No signing cert secret — ad-hoc signing (permissions reset per update)."
+            codesign --force --deep --sign - dist/Spuk.app || true
+            exit 0
+          fi
+          CERTDIR="$RUNNER_TEMP/spuk-cert"; mkdir -p "$CERTDIR"
+          echo "$SPUK_CERT_P12_BASE64" | base64 --decode > "$CERTDIR/cert.p12"
+          KC="$RUNNER_TEMP/spuk-signing.keychain-db"
+          security create-keychain -p "$SPUK_KEYCHAIN_PASSWORD" "$KC"
+          security set-keychain-settings -lut 21600 "$KC"
+          security unlock-keychain -p "$SPUK_KEYCHAIN_PASSWORD" "$KC"
+          security import "$CERTDIR/cert.p12" -k "$KC" -P "$SPUK_CERT_PASSWORD" -T /usr/bin/codesign -A
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$SPUK_KEYCHAIN_PASSWORD" "$KC" >/dev/null
+          security list-keychains -d user -s "$KC" $(security list-keychains -d user | sed 's/"//g')
+          # Self-signed cert isn't Apple-anchored, so trust it for code signing in
+          # the system domain (passwordless sudo on the runner) or codesign refuses.
+          openssl pkcs12 -legacy -in "$CERTDIR/cert.p12" -nokeys -clcerts -passin pass:"$SPUK_CERT_PASSWORD" -out "$CERTDIR/cert.pem" 2>/dev/null \
+            || openssl pkcs12 -in "$CERTDIR/cert.p12" -nokeys -clcerts -passin pass:"$SPUK_CERT_PASSWORD" -out "$CERTDIR/cert.pem"
+          sudo security add-trusted-cert -d -r trustRoot -p codeSign -k /Library/Keychains/System.keychain "$CERTDIR/cert.pem"
+          codesign --force --deep --sign "Spuk Self-Signed" --keychain "$KC" dist/Spuk.app
+          echo "Signed. Designated Requirement:"; codesign -d -r- dist/Spuk.app 2>&1 | grep -i designated || true
+          codesign -v --strict dist/Spuk.app && echo "signature valid"
 
       - name: Zip the .app (ditto preserves symlinks + metadata)
         # plain `zip` corrupts a macOS .app bundle (Qt framework symlinks); use ditto.
