@@ -32,8 +32,9 @@ from .settings_store import update_user_settings
 log = logging.getLogger("spuk.ui_permissions")
 
 # (settings key, display name, why it's needed) — listed in the order to grant.
+# Microphone is intentionally absent: Spuk only appears in that pane after it first
+# opens the mic, and macOS prompts for it on the first recording anyway.
 _PERMS = (
-    ("microphone", "Microphone", "to hear your voice"),
     ("input_monitoring", "Input Monitoring", "to detect the hotkey"),
     ("accessibility", "Accessibility", "to paste the text"),
 )
@@ -81,8 +82,9 @@ class PermissionsDialog(QDialog):
         v.addLayout(head)
 
         intro = QLabel(
-            "macOS resets these after each update. Turn on all three, then "
-            "quit & reopen Spuk — a grant only takes effect on a fresh start."
+            "Turn both on, then quit & reopen Spuk — a grant only takes effect on "
+            "a fresh start. You only need to do this once; Spuk now keeps them "
+            "across updates. (Microphone is asked for the first time you record.)"
         )
         intro.setObjectName("intro")
         intro.setWordWrap(True)
