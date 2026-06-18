@@ -1,5 +1,8 @@
 """Version-comparison logic for the update checker (no network)."""
 
+import os
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -207,6 +210,60 @@ class WindowsUpdateScript(unittest.TestCase):
         script = self._script()
         self.assertIn("if exist", script.lower())
         self.assertIn(r"C:\Temp\spuk\extracted\Spuk\Spuk.exe", script)  # fallback target
+
+
+class ExtractUpdate(unittest.TestCase):
+    """The extractor must preserve a macOS .app's symlink farm.
+
+    Python's zipfile flattens symlinks into plain files, which corrupts a macOS
+    .app bundle (every framework's ``Versions/Current`` link) so it won't launch
+    ("Spuk can't be opened"). On macOS the extractor must use ditto, which keeps
+    symlinks; other platforms fall back to the stdlib extractor.
+    """
+
+    @unittest.skipUnless(sys.platform == "darwin", "ditto + bundle symlinks are macOS-only")
+    def test_macos_extract_preserves_symlinks(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            # A minimal framework-shaped bundle: Versions/A holds the real file;
+            # Versions/Current and the top-level entry are symlinks into it.
+            fw = root / "Spuk.app" / "Contents" / "Frameworks" / "Foo.framework"
+            (fw / "Versions" / "A").mkdir(parents=True)
+            (fw / "Versions" / "A" / "Foo").write_bytes(b"binary")
+            (fw / "Versions" / "Current").symlink_to("A")
+            (fw / "Foo").symlink_to("Versions/Current/Foo")
+            zip_path = root / "u.zip"
+            # Zip it exactly the way the release workflow does.
+            subprocess.run(
+                ["/usr/bin/ditto", "-c", "-k", "--keepParent", str(root / "Spuk.app"), str(zip_path)],
+                check=True,
+            )
+
+            out = root / "out"
+            out.mkdir()
+            updates._extract_update(zip_path, out)
+
+            current = out / "Spuk.app/Contents/Frameworks/Foo.framework/Versions/Current"
+            top = out / "Spuk.app/Contents/Frameworks/Foo.framework/Foo"
+            self.assertTrue(current.is_symlink(), "Versions/Current must stay a symlink, not a flattened file")
+            self.assertEqual(os.readlink(current), "A")
+            self.assertTrue(top.is_symlink(), "the framework's top-level entry must stay a symlink")
+
+    def test_non_macos_uses_stdlib_zipfile(self):
+        # Windows/Linux archives carry no symlinks, so the stdlib path is used —
+        # and must not depend on macOS-only ditto.
+        import zipfile as _zf
+
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            zip_path = root / "u.zip"
+            with _zf.ZipFile(zip_path, "w") as z:
+                z.writestr("hello.txt", "hi")
+            out = root / "out"
+            out.mkdir()
+            with mock.patch.object(updates.sys, "platform", "win32"):
+                updates._extract_update(zip_path, out)
+            self.assertEqual((out / "hello.txt").read_text(), "hi")
 
 
 if __name__ == "__main__":
