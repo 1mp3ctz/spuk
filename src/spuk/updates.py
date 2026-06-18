@@ -261,6 +261,26 @@ def _download_zip(
     return zip_path
 
 
+def _extract_update(zip_path: Path, extract_dir: Path) -> None:
+    """Unpack the release zip into ``extract_dir``, preserving symlinks on macOS.
+
+    A macOS ``.app`` is a farm of symlinks — every bundled framework points its
+    top-level entries and ``Versions/Current`` at ``Versions/A`` through
+    symlinks. Python's :mod:`zipfile` does **not** restore symlinks:
+    ``extractall`` writes each one as a regular file containing the link target,
+    which silently flattens the whole bundle so macOS refuses to launch it
+    ("Spuk can't be opened"). ``ditto`` restores symlinks and metadata exactly,
+    and is the same tool the release workflow uses to *create* the zip, so we
+    round-trip cleanly. Other platforms have no such symlinks in the archive, so
+    the stdlib extractor is fine (and keeps Windows free of a ``ditto`` dep).
+    """
+    if sys.platform == "darwin":
+        subprocess.run(["/usr/bin/ditto", "-x", "-k", str(zip_path), str(extract_dir)], check=True)
+    else:
+        with zipfile.ZipFile(zip_path) as archive:
+            archive.extractall(extract_dir)
+
+
 def _apply_macos(extract_dir: Path) -> None:
     new_app = next(iter(extract_dir.rglob("*.app")), None)
     cur_app = _installed_macos_app()
@@ -343,8 +363,7 @@ def self_update(
     extract_dir = tmp / "extracted"
     extract_dir.mkdir()
     zip_path = _download_zip(asset_url, tmp, progress=progress, cancel=cancel)
-    with zipfile.ZipFile(zip_path) as archive:
-        archive.extractall(extract_dir)
+    _extract_update(zip_path, extract_dir)
 
     if sys.platform == "darwin":
         _apply_macos(extract_dir)
