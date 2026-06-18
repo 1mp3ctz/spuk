@@ -152,6 +152,62 @@ class DownloadProgress(unittest.TestCase):
                 path = updates._download_zip("http://x/u.zip", Path(d))
                 self.assertEqual(path.read_bytes(), data)
 
+    def test_download_uses_a_verifying_ssl_context(self):
+        # Frozen Windows builds can't rely on the system CA store; the download
+        # must pass an explicit cert-verifying context (certifi) to urlopen.
+        captured: dict = {}
+
+        def fake_urlopen(req, timeout=None, context=None):
+            captured["context"] = context
+            return _FakeResponse(b"zip")
+
+        with mock.patch.object(updates.urllib.request, "urlopen", side_effect=fake_urlopen):
+            with tempfile.TemporaryDirectory() as d:
+                updates._download_zip("http://x/u.zip", Path(d))
+        import ssl
+        self.assertIsInstance(captured["context"], ssl.SSLContext)
+        self.assertEqual(captured["context"].verify_mode, ssl.CERT_REQUIRED)
+
+
+class SslContext(unittest.TestCase):
+    """The TLS context used for the check + download verifies certificates."""
+
+    def test_is_a_verifying_context(self):
+        import ssl
+        ctx = updates._ssl_context()
+        self.assertIsInstance(ctx, ssl.SSLContext)
+        self.assertEqual(ctx.verify_mode, ssl.CERT_REQUIRED)
+        self.assertTrue(ctx.check_hostname)
+
+
+class WindowsUpdateScript(unittest.TestCase):
+    """The detached swap-and-relaunch .bat must survive a console-less launch."""
+
+    def _script(self) -> str:
+        return updates._windows_update_script(
+            Path(r"C:\Temp\spuk\extracted\Spuk"), Path(r"C:\Users\x\Spuk"), 4321
+        )
+
+    def test_does_not_use_console_only_timeout(self):
+        # `timeout` needs a console input handle; the helper runs DETACHED (no
+        # console), where it aborts instantly and busy-loops. Must use `ping`.
+        script = self._script().lower()
+        self.assertNotIn("timeout", script)
+        self.assertIn("ping", script)
+
+    def test_waits_on_our_pid_then_mirrors_then_relaunches(self):
+        script = self._script()
+        self.assertIn("4321", script)            # waits for THIS Spuk to exit
+        self.assertIn("robocopy", script.lower())
+        self.assertIn("Spuk.exe", script)
+
+    def test_relaunches_even_if_the_in_place_swap_failed(self):
+        # If robocopy can't write the install dir (locked / admin-only), the app
+        # has already quit — it must still come back, from the downloaded copy.
+        script = self._script()
+        self.assertIn("if exist", script.lower())
+        self.assertIn(r"C:\Temp\spuk\extracted\Spuk\Spuk.exe", script)  # fallback target
+
 
 if __name__ == "__main__":
     unittest.main()

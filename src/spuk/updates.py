@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import ssl
 import subprocess
 import sys
 import tempfile
@@ -44,6 +45,26 @@ class UpdateCancelled(Exception):
 REPO = "1mp3ctz/spuk"
 LATEST_API = f"https://api.github.com/repos/{REPO}/releases/latest"
 RELEASES_PAGE = f"https://github.com/{REPO}/releases/latest"
+
+
+def _ssl_context() -> ssl.SSLContext:
+    """A cert-verifying TLS context backed by certifi's CA bundle.
+
+    A frozen (PyInstaller) build doesn't always have a usable system CA store —
+    on Windows especially, bare ``urllib`` can fail TLS verification with
+    CERTIFICATE_VERIFY_FAILED even though a browser on the same machine works,
+    which silently breaks both the update check and the download. ``certifi``
+    (already a transitive dependency, and bundled into the build because this
+    import makes PyInstaller collect it) ships a known-good root bundle, so we
+    point urllib at it for consistent verification everywhere. Falls back to the
+    system default context if certifi is somehow unavailable — still verifying.
+    """
+    try:
+        import certifi
+
+        return ssl.create_default_context(cafile=certifi.where())
+    except Exception:  # noqa: BLE001 - any import/IO problem → system default
+        return ssl.create_default_context()
 
 
 @dataclass(frozen=True)
@@ -106,7 +127,7 @@ def check_for_update(current: str, timeout: float = 6.0) -> UpdateResult:
         headers={"User-Agent": f"Spuk/{current}", "Accept": "application/vnd.github+json"},
     )
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        with urllib.request.urlopen(request, timeout=timeout, context=_ssl_context()) as response:
             data = json.load(response)
     except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
         log.warning("Update check failed: %s", exc)
@@ -221,7 +242,7 @@ def _download_zip(
     """
     request = urllib.request.Request(url, headers={"User-Agent": "Spuk-updater"})
     zip_path = dest_dir / "update.zip"
-    with urllib.request.urlopen(request, timeout=timeout) as response:
+    with urllib.request.urlopen(request, timeout=timeout, context=_ssl_context()) as response:
         total = int(response.headers.get("Content-Length") or 0)
         done = 0
         if progress is not None:
@@ -262,20 +283,39 @@ def _apply_macos(extract_dir: Path) -> None:
     subprocess.Popen(["/bin/sh", str(helper), str(os.getpid())], start_new_session=True)
 
 
+def _windows_update_script(new_dir: Path, cur_dir: Path, pid: int) -> str:
+    """The .bat that waits for Spuk to quit, swaps in the new build, relaunches.
+
+    It runs DETACHED (no console), which dictates two non-obvious choices:
+
+    * **No ``timeout``.** ``timeout`` reads the console input handle and aborts
+      instantly ("Input redirection is not supported") when there's no console,
+      which turned the wait into a CPU-pegging busy-loop. ``ping -n 2`` is the
+      console-free ~1s sleep instead.
+    * **Always relaunch.** The caller quits Spuk the moment this is staged, so a
+      failed swap used to leave the user with a vanished app ("closes and never
+      comes back"). If ``robocopy`` can't write the install dir (file locked, or
+      an admin-only location like Program Files) we relaunch the freshly
+      downloaded copy instead, so Spuk always returns. robocopy output is logged
+      to ``%TEMP%\\spuk_update.log`` for post-mortem.
+    """
+    return (
+        "@echo off\r\n"
+        ":wait\r\n"
+        f'tasklist /FI "PID eq {pid}" | find "{pid}" >nul && (ping -n 2 127.0.0.1 >nul & goto wait)\r\n'
+        f'robocopy "{new_dir}" "{cur_dir}" /MIR /NFL /NDL /NJH /NJS /NP >"%TEMP%\\spuk_update.log" 2>&1\r\n'
+        f'if exist "{cur_dir}\\Spuk.exe" (start "" "{cur_dir}\\Spuk.exe") '
+        f'else (start "" "{new_dir}\\Spuk.exe")\r\n'
+    )
+
+
 def _apply_windows(extract_dir: Path) -> None:
     new_exe = next(iter(extract_dir.rglob("Spuk.exe")), None)
     if new_exe is None:
         raise RuntimeError("Couldn't locate Spuk.exe in the download.")
-    new_dir = new_exe.parent
-    cur_dir = Path(sys.executable).resolve().parent
-    pid = os.getpid()
     bat = extract_dir.parent / "spuk_update.bat"
     bat.write_text(
-        "@echo off\r\n"
-        ":wait\r\n"
-        f'tasklist /FI "PID eq {pid}" | find "{pid}" >nul && (timeout /t 1 /nobreak >nul & goto wait)\r\n'
-        f'robocopy "{new_dir}" "{cur_dir}" /MIR /NFL /NDL /NJH /NJS /NP >nul\r\n'
-        f'start "" "{cur_dir}\\Spuk.exe"\r\n'
+        _windows_update_script(new_exe.parent, Path(sys.executable).resolve().parent, os.getpid())
     )
     DETACHED_PROCESS = 0x00000008
     subprocess.Popen(["cmd", "/c", str(bat)], creationflags=DETACHED_PROCESS, close_fds=True)
