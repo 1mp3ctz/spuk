@@ -20,6 +20,11 @@ dependencies = [
     # it off macOS/Windows, where it can't build (it compiles against Linux input
     # headers). Import name and PyPI distribution are both 'evdev'.
     "evdev; sys_platform == 'linux'",
+    # macOS only: the dual-Command screenshot gesture needs a Quartz CGEventTap
+    # (flagsChanged) and Cocoa (NSWorkspace/NSPasteboard/CGWindowList). Import
+    # names are 'Quartz' and 'AppKit'/'Foundation'.
+    "pyobjc-framework-Quartz>=10,<12; sys_platform == 'darwin'",
+    "pyobjc-framework-Cocoa>=10,<12; sys_platform == 'darwin'",
 ]
 
 [project.scripts]
