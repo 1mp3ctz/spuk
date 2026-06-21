@@ -155,7 +155,33 @@ def request_input_monitoring() -> bool | None:
 PRIVACY_PANES = {
     "input_monitoring": "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent",
     "accessibility": "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
+    "screen_recording": "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture",
 }
+
+
+def screen_recording_trusted() -> bool | None:
+    """Whether this process may capture window contents (Screen Recording)."""
+    if platform.system() != "Darwin":
+        return True
+    try:
+        from Quartz import CGPreflightScreenCaptureAccess
+
+        return bool(CGPreflightScreenCaptureAccess())
+    except Exception as exc:  # noqa: BLE001
+        log.debug("Could not check Screen Recording trust: %s", exc)
+        return None
+
+
+def request_screen_recording() -> None:
+    """Raise the macOS Screen Recording prompt. Grant applies after relaunch."""
+    if platform.system() != "Darwin":
+        return
+    try:
+        from Quartz import CGRequestScreenCaptureAccess
+
+        CGRequestScreenCaptureAccess()
+    except Exception as exc:  # noqa: BLE001
+        log.debug("Could not request Screen Recording: %s", exc)
 
 
 def open_privacy_pane(name: str) -> bool:
