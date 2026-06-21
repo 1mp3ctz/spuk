@@ -68,10 +68,11 @@ def test_dismissed_old_version_does_not_suppress_a_missing_grant():
 
 def test_privacy_panes_target_the_correct_anchors():
     # Microphone is intentionally absent (granted via macOS's own prompt on first record).
-    assert set(permissions.PRIVACY_PANES) == {"input_monitoring", "accessibility", "screen_recording"}
+    assert set(permissions.PRIVACY_PANES) == {"input_monitoring", "accessibility", "screen_recording", "speech_recognition"}
     assert permissions.PRIVACY_PANES["input_monitoring"].endswith("Privacy_ListenEvent")
     assert permissions.PRIVACY_PANES["accessibility"].endswith("Privacy_Accessibility")
     assert permissions.PRIVACY_PANES["screen_recording"].endswith("Privacy_ScreenCapture")
+    assert permissions.PRIVACY_PANES["speech_recognition"].endswith("Privacy_SpeechRecognition")
 
 
 def test_open_privacy_pane_runs_open_with_the_url(monkeypatch):

@@ -83,12 +83,18 @@ class ScreenshotConfig:
 
 
 @dataclass(frozen=True)
+class AppleSpeechConfig:
+    enabled: bool = True
+
+
+@dataclass(frozen=True)
 class Config:
     transcribe: TranscribeConfig
     hotkey: HotkeyConfig
     audio: AudioConfig
     post_process: PostProcessConfig
     screenshot: ScreenshotConfig
+    apple_speech: AppleSpeechConfig
 
 
 def _overlay_user_languages(t: dict) -> None:
@@ -182,6 +188,7 @@ def load_config(path: Path | None = None) -> Config:
         s = dict(raw.get("screenshot", {}))
         _overlay_user_screenshot(s)
         screenshot = ScreenshotConfig(**s)
+        apple_speech = AppleSpeechConfig(**raw.get("apple_speech", {}))
     except (KeyError, TypeError) as exc:
         raise ValueError(f"Invalid or incomplete config in {cfg_path}: {exc}") from exc
 
@@ -197,4 +204,5 @@ def load_config(path: Path | None = None) -> Config:
         )
 
     return Config(transcribe=transcribe, hotkey=hotkey, audio=audio,
-                  post_process=post_process, screenshot=screenshot)
+                  post_process=post_process, screenshot=screenshot,
+                  apple_speech=apple_speech)

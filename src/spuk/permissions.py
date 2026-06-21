@@ -156,6 +156,7 @@ PRIVACY_PANES = {
     "input_monitoring": "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent",
     "accessibility": "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
     "screen_recording": "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture",
+    "speech_recognition": "x-apple.systempreferences:com.apple.preference.security?Privacy_SpeechRecognition",
 }
 
 
@@ -182,6 +183,20 @@ def request_screen_recording() -> None:
         CGRequestScreenCaptureAccess()
     except Exception as exc:  # noqa: BLE001
         log.debug("Could not request Screen Recording: %s", exc)
+
+
+def speech_recognition_authorized() -> bool | None:
+    """Whether Speech Recognition is authorized for this process.
+
+    Returns True="authorized", False="denied"/"restricted", None="not_determined".
+    """
+    from . import apple_speech
+    status = apple_speech.speech_auth_status()
+    if status == "authorized":
+        return True
+    if status in ("denied", "restricted"):
+        return False
+    return None  # not_determined — user hasn't been asked yet
 
 
 def open_privacy_pane(name: str) -> bool:

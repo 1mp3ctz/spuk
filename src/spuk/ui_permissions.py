@@ -96,6 +96,11 @@ class PermissionsDialog(QDialog):
                 ("screen_recording", "Screen Recording",
                  "so the ⌘+⌘ screenshot can capture the window")
             )
+        if permissions.speech_recognition_authorized() is False:
+            all_rows.append(
+                ("speech_recognition", "Speech Recognition",
+                 "so Apple's on-device engine can hear you")
+            )
         for key, name, why in all_rows:
             row = QFrame()
             row.setObjectName("row")
@@ -153,6 +158,8 @@ class PermissionsDialog(QDialog):
         statuses = permissions.permission_status()
         if "screen_recording" in self._icons:
             statuses["screen_recording"] = permissions.screen_recording_trusted()
+        if "speech_recognition" in self._icons:
+            statuses["speech_recognition"] = permissions.speech_recognition_authorized()
         for key, icon in self._icons.items():
             status = statuses.get(key)
             color = _OK if status is True else _BAD if status is False else _UNK

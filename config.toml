@@ -44,3 +44,10 @@ max_calls_per_day             = 50      # hard cap, fails closed
 # field. Fully local — nothing is uploaded.
 enabled = true
 gesture = "dual_cmd"   # reserved for future trigger choices
+
+[apple_speech]
+# macOS only. Hold the Fn (Globe) key to dictate with Apple's on-device engine.
+# Words appear live as you speak; release Fn to finalise. Fully local — no network.
+# Note: set System Settings → Keyboard → "Press Globe key to: Do Nothing" so macOS
+# doesn't open its own dictation popup when you press Fn.
+enabled = true
