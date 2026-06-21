@@ -146,6 +146,20 @@ def _overlay_user_hotkey(h: dict) -> None:
         h["paste_key"] = paste
 
 
+def _overlay_user_screenshot(s: dict) -> None:
+    """Overlay the user's saved screenshot preference onto the defaults.
+
+    Mutates ``s`` in place. Ignores absent/wrong-type values so the bundled
+    config.toml default (enabled=True) is preserved when nothing is saved.
+    """
+    from .settings_store import load_user_settings
+
+    user = load_user_settings()
+    enabled = user.get("screenshot_enabled")
+    if isinstance(enabled, bool):
+        s["enabled"] = enabled
+
+
 def load_config(path: Path | None = None) -> Config:
     """Load and validate the TOML config. Raises with a clear message on error."""
     cfg_path = path or DEFAULT_CONFIG_PATH
@@ -165,7 +179,9 @@ def load_config(path: Path | None = None) -> Config:
         hotkey = HotkeyConfig(**h)
         audio = AudioConfig(**raw["audio"])
         post_process = PostProcessConfig(**raw["post_process"])
-        screenshot = ScreenshotConfig(**raw.get("screenshot", {}))
+        s = dict(raw.get("screenshot", {}))
+        _overlay_user_screenshot(s)
+        screenshot = ScreenshotConfig(**s)
     except (KeyError, TypeError) as exc:
         raise ValueError(f"Invalid or incomplete config in {cfg_path}: {exc}") from exc
 

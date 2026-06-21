@@ -41,6 +41,7 @@ from .config import Config
 from .core import SpukCore
 from .hotkey_format import combo_to_label
 from .languages import display_name
+from .screenshot_gesture import start_if_enabled as _start_screenshot
 
 # Native display names for the three first-class languages; anything else falls
 # back to the English language name from languages.display_name().
@@ -471,6 +472,7 @@ def run_bar(config: Config, core: SpukCore) -> None:
     # macOS/Windows, evdev on Linux) so it can swap it live when the user
     # changes a hotkey in Settings.
     core.start_input()
+    _screenshot_tap = _start_screenshot(config)
 
     def quit_app() -> None:
         # Quit cleanly: stop the Qt event loop and let the process shut down
@@ -479,6 +481,8 @@ def run_bar(config: Config, core: SpukCore) -> None:
         # release faster-whisper's multiprocessing semaphore and tear the macOS
         # CGEventTap down in order, avoiding the "Python quit unexpectedly" trap
         # the hard exit caused.
+        if _screenshot_tap:
+            _screenshot_tap.stop()
         app.quit()
 
     window.set_quit(quit_app)

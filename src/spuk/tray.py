@@ -10,8 +10,9 @@ from __future__ import annotations
 
 import logging
 
-from .config import Config
+from .config import Config, ScreenshotConfig
 from .core import SpukCore
+from .screenshot_gesture import start_if_enabled as _start_screenshot
 
 log = logging.getLogger("spuk.tray")
 
@@ -38,6 +39,7 @@ def _make_icon_image():
 def run_tray(config: Config, core: SpukCore) -> None:
     import pystray
     from pystray import Menu, MenuItem
+    from .settings_store import update_user_settings
 
     def lang_label(code: str) -> str:
         return LANGUAGE_NAMES.get(code, code)
@@ -56,8 +58,27 @@ def run_tray(config: Config, core: SpukCore) -> None:
         for code in core.languages
     ]
 
+    # Mutable container so the toggle callback can swap the handle.
+    _tap = [None]
+
+    def is_screenshot_enabled(item):
+        return _tap[0] is not None
+
+    def toggle_screenshot(icon, item):
+        if _tap[0] is not None:
+            _tap[0].stop()
+            _tap[0] = None
+            update_user_settings(screenshot_enabled=False)
+        else:
+            cfg = type("_C", (), {"screenshot": ScreenshotConfig(enabled=True)})()
+            _tap[0] = _start_screenshot(cfg)
+            update_user_settings(screenshot_enabled=True)
+        icon.update_menu()
+
     def on_quit(icon, item):
         log.info("Quitting Spuk.")
+        if _tap[0] is not None:
+            _tap[0].stop()
         # Clean stop: end the tray loop and let the process exit normally. The
         # hotkey listener is a daemon thread, so it doesn't block shutdown.
         icon.stop()
@@ -66,6 +87,7 @@ def run_tray(config: Config, core: SpukCore) -> None:
         MenuItem(lambda item: f"Spuk — {lang_label(core.language)}", None, enabled=False),
         Menu.SEPARATOR,
         MenuItem("Language", Menu(*language_items)),
+        MenuItem("Screenshot on ⌘ + ⌘", toggle_screenshot, checked=is_screenshot_enabled),
         Menu.SEPARATOR,
         MenuItem("Quit", on_quit),
     )
@@ -79,6 +101,7 @@ def run_tray(config: Config, core: SpukCore) -> None:
     # model, then block on the tray (main thread). Backend is pynput on
     # macOS/Windows, evdev on Linux — both return a handle with .stop().
     core.start_input()
+    _tap[0] = _start_screenshot(config)
     log.info("Warming model… (first launch downloads it)")
     core.warm()
     log.info(
