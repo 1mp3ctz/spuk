@@ -310,7 +310,11 @@ class SpukBar(QWidget):
             self._live_insert.commit()
 
     def _on_fn_press(self) -> None:
-        if not self._cfg.apple_speech.enabled:
+        enabled = getattr(self, "_apple_enabled", None)
+        if enabled is not None:
+            if not enabled[0]:
+                return
+        elif not self._cfg.apple_speech.enabled:
             return
         if self._live_insert is None:
             return
@@ -540,16 +544,27 @@ def run_bar(config: Config, core: SpukCore) -> None:
     # changes a hotkey in Settings.
     core.start_input()
 
+    # Apple Dictation (Fn) toggle: runtime flag so the menu-bar checkbox takes
+    # effect immediately without a relaunch. Defined here (before the Fn callbacks)
+    # so the closures below can reference it. Also stored on bar so _on_fn_press
+    # can check it at runtime instead of the stale startup config value.
+    _apple_enabled = [config.apple_speech.enabled]
+    bar._apple_enabled = _apple_enabled  # type: ignore[attr-defined]
+
     # Fn dictation callbacks: marshal through Qt signals so engine start/stop
     # runs on the main thread (same as where pynput paste injection must run).
+    # Always armed on Darwin — the _apple_enabled[0] runtime check inside each
+    # callback means toggling the menu-bar checkbox takes effect immediately.
     _fn_press_cb = None
     _fn_release_cb = None
-    if platform.system() == "Darwin" and config.apple_speech.enabled:
+    if platform.system() == "Darwin":
         def _fn_press_cb() -> None:  # noqa: E306
-            signals.live_start.emit()
+            if _apple_enabled[0]:
+                signals.live_start.emit()
 
         def _fn_release_cb() -> None:  # noqa: E306
-            signals.live_stop.emit()
+            if _apple_enabled[0]:
+                signals.live_stop.emit()
 
     _screenshot_tap = _start_screenshot(
         config,
@@ -592,10 +607,6 @@ def run_bar(config: Config, core: SpukCore) -> None:
         def open_permissions() -> None:  # noqa: F811 - macOS-only definition
             app._spuk_perms_dialog = PermissionsDialog(on_quit=quit_app)  # type: ignore[attr-defined]
             app._spuk_perms_dialog.present()  # type: ignore[attr-defined]
-
-    # Apple Dictation (Fn) toggle: saves preference; the Fn callbacks above are
-    # already wired — toggling here just persists the intent for next launch.
-    _apple_enabled = [config.apple_speech.enabled]
 
     def toggle_apple_speech(checked: bool) -> None:
         from .settings_store import update_user_settings
