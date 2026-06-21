@@ -8,9 +8,10 @@ background thread.
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 
-from .config import Config, ScreenshotConfig
+from .config import Config
 from .core import SpukCore
 from .screenshot_gesture import start_if_enabled as _start_screenshot
 
@@ -58,21 +59,25 @@ def run_tray(config: Config, core: SpukCore) -> None:
         for code in core.languages
     ]
 
-    # Mutable container so the toggle callback can swap the handle.
+    # Mutable containers so toggle callbacks can swap state (mutable-closure pattern).
     _tap = [None]
+    _enabled = [config.screenshot.enabled]
 
     def is_screenshot_enabled(item):
-        return _tap[0] is not None
+        return _enabled[0]
 
     def toggle_screenshot(icon, item):
-        if _tap[0] is not None:
-            _tap[0].stop()
-            _tap[0] = None
+        if _enabled[0]:
+            _enabled[0] = False
             update_user_settings(screenshot_enabled=False)
+            if _tap[0] is not None:
+                _tap[0].stop()
+                _tap[0] = None
         else:
-            cfg = type("_C", (), {"screenshot": ScreenshotConfig(enabled=True)})()
-            _tap[0] = _start_screenshot(cfg)
+            _enabled[0] = True
             update_user_settings(screenshot_enabled=True)
+            cfg_on = dataclasses.replace(config, screenshot=dataclasses.replace(config.screenshot, enabled=True))
+            _tap[0] = _start_screenshot(cfg_on)
         icon.update_menu()
 
     def on_quit(icon, item):
