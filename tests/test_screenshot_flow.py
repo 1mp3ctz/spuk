@@ -20,9 +20,12 @@ def test_shoot_and_paste_runs_capture_copy_paste_in_order(tmp_path):
     def paste():
         order.append("paste")
 
-    ok = screenshot.shoot_and_paste(capture=capture, copy=copy, paste=paste)
+    def sound():
+        order.append("sound")
+
+    ok = screenshot.shoot_and_paste(capture=capture, copy=copy, paste=paste, sound=sound)
     assert ok is True
-    assert order == ["capture", "copy", "paste"]
+    assert order == ["capture", "copy", "sound", "paste"]
 
 
 def test_shoot_and_paste_noops_when_capture_returns_none():
@@ -31,6 +34,7 @@ def test_shoot_and_paste_noops_when_capture_returns_none():
         capture=lambda: None,
         copy=lambda p: calls.append("copy"),
         paste=lambda: calls.append("paste"),
+        sound=lambda: calls.append("sound"),
     )
     assert ok is False
     assert calls == []
