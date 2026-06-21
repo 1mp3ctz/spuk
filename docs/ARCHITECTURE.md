@@ -96,6 +96,28 @@ rebuilds → TCC may re-prompt; a free "Apple Development" cert keeps TCC stable
 **Do not sandbox** — a sandboxed app can't post `CGEvent`s into other apps, which
 would kill the core feature.
 
+## Window screenshot (macOS-only)
+
+Press both ⌘ keys simultaneously to capture the frontmost window and paste it as an image.
+
+### `mac_flags_tap` — listen-only Quartz event tap
+
+`MacFlagsTap` (`screenshot.py`) opens a **listen-only** `CGEventTap` on the `flagsChanged` event (modifier state changes). It is passive — it never intercepts or swallows events — which means it requires no Accessibility permission and cannot block other keyboard input. The tap calls `on_dual_cmd` when both ⌘ bits are set and no other modifiers are held.
+
+This is the shared foundation that also unblocks Fn-key hotkey support (issue #17): a dedicated `flagsChanged` tap reading the `kCGEventFlagMaskSecondaryFn` bit is the same pattern, macOS-only, and fits cleanly into this seam.
+
+### Window picker + capture
+
+`pick_window` reads `CGWindowListCopyWindowInfo` to find the frontmost app's layer-0 window, then `capture_window_to_png` runs `screencapture -l <window_id>` to write a PNG to a temp file. Both calls stay local — no network involved.
+
+### Clipboard + paste
+
+`copy_image_to_clipboard` writes the PNG bytes onto `NSPasteboard` via `AppKit`. `send_paste_shortcut` sends ⌘V via the existing CGEvent injector. The image stays on the Mac; nothing is uploaded.
+
+### Permission
+
+Capturing another app's window pixels requires **Screen Recording** (TCC key `kTCCServiceScreenCapture`). Spuk requests it lazily when the screenshot gesture is first triggered (`request_screen_recording`). The permissions helper dialog shows a row for it only when it is not yet granted (`screen_recording_trusted() is False`).
+
 ## Optional Claude post-processing
 
 One interface, off by default, can never silently spend money:

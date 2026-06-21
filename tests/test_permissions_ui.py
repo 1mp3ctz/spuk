@@ -89,3 +89,32 @@ def test_quit_and_reopen_does_not_quit_when_relaunch_unavailable(monkeypatch):
     dlg = ui_permissions.PermissionsDialog(on_quit=lambda: quit_calls.append(1))
     dlg._quit_reopen()
     assert quit_calls == []
+
+
+def test_screen_recording_row_shown_when_untrusted(monkeypatch):
+    _app()
+    monkeypatch.setattr(permissions, "permission_status", lambda: _all(True))
+    monkeypatch.setattr(permissions, "screen_recording_trusted", lambda: False)
+    dlg = ui_permissions.PermissionsDialog()
+    assert "screen_recording" in dlg._icons
+    assert dlg._icons["screen_recording"].text() == "✕"
+    assert "screen_recording" in dlg._open_buttons
+
+
+def test_screen_recording_row_absent_when_trusted(monkeypatch):
+    _app()
+    monkeypatch.setattr(permissions, "permission_status", lambda: _all(True))
+    monkeypatch.setattr(permissions, "screen_recording_trusted", lambda: True)
+    dlg = ui_permissions.PermissionsDialog()
+    assert "screen_recording" not in dlg._icons
+
+
+def test_screen_recording_open_button_opens_pane(monkeypatch):
+    _app()
+    monkeypatch.setattr(permissions, "permission_status", lambda: _all(True))
+    monkeypatch.setattr(permissions, "screen_recording_trusted", lambda: False)
+    opened = []
+    monkeypatch.setattr(permissions, "open_privacy_pane", lambda name: opened.append(name) or True)
+    dlg = ui_permissions.PermissionsDialog()
+    dlg._open_buttons["screen_recording"].click()
+    assert opened == ["screen_recording"]

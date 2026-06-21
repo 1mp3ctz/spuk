@@ -85,6 +85,7 @@ app = BUNDLE(
     info_plist={
         "LSUIElement": True,  # background/menu-bar app, no Dock icon
         "NSMicrophoneUsageDescription": "Spuk transcribes your speech locally.",
+        "NSScreenCaptureUsageDescription": "Spuk captures the window you choose (press both Command keys) so you can paste it. The image stays on your Mac.",
         "CFBundleShortVersionString": "1.0.8",
     },
 )

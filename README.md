@@ -18,6 +18,7 @@ speech model understands around 100, so you can dictate in whatever you speak.
 - 🔒 **Private** — everything happens on your own computer. Nothing is uploaded.
 - 🌍 **Almost any language** — around 100 supported (English, German, Polish, Spanish, French, Ukrainian, and many more). Add the ones you speak and switch any time; accents and special characters (ä ö ü ß, ą ę ł ó ż, …) just work.
 - 🎤 **Just hold a key and talk** — no buttons to find, no windows to open.
+- 🪟 **Window screenshot (macOS)** — press both ⌘ keys to copy and paste the current window as an image. Fully local; needs Screen Recording permission.
 - 💻 **Mac, Windows, and Linux** — same app, your choice.
 
 There's a small floating pill at the bottom of your screen that shows when Spuk is
@@ -88,6 +89,7 @@ in each of these:
 - **Microphone** — so it can hear you. ✅
 - **Accessibility** — so it can type the text for you. ✅
 - **Input Monitoring** — so the hold-to-talk key works. ✅
+- **Screen Recording** — so the ⌘+⌘ window screenshot works (only if you use that feature). ✅
 
 > If you don't see Spuk in one of these lists, try Spuk once (hold the keys and
 > talk) and it will appear so you can switch it on. You may need to quit and reopen

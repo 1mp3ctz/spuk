@@ -90,7 +90,13 @@ class PermissionsDialog(QDialog):
         intro.setWordWrap(True)
         v.addWidget(intro)
 
-        for key, name, why in _PERMS:
+        all_rows = list(_PERMS)
+        if permissions.screen_recording_trusted() is False:
+            all_rows.append(
+                ("screen_recording", "Screen Recording",
+                 "so the ⌘+⌘ screenshot can capture the window")
+            )
+        for key, name, why in all_rows:
             row = QFrame()
             row.setObjectName("row")
             rl = QHBoxLayout(row)
@@ -145,6 +151,8 @@ class PermissionsDialog(QDialog):
     def refresh(self) -> None:
         """Re-query macOS and update each row's ✓ / ✕ / ? status."""
         statuses = permissions.permission_status()
+        if "screen_recording" in self._icons:
+            statuses["screen_recording"] = permissions.screen_recording_trusted()
         for key, icon in self._icons.items():
             status = statuses.get(key)
             color = _OK if status is True else _BAD if status is False else _UNK
