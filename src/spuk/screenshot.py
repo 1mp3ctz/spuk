@@ -96,12 +96,44 @@ def copy_image_to_clipboard(path: str) -> None:
     pb.setData_forType_(data, NSPasteboardTypePNG)
 
 
-def shoot_and_paste(*, capture=front_window_png, copy=copy_image_to_clipboard, paste=None) -> bool:
-    """Capture the front window → clipboard → paste it into the focused field.
+# macOS ships the camera-shutter sound used for screenshots; play it so the user
+# HEARS that a capture happened (screencapture itself is silenced with -x).
+_SHUTTER_SOUNDS = (
+    "/System/Library/Components/CoreAudio.component/Contents/SharedSupport/SystemSounds/system/Shutter.aif",
+    "/System/Library/Components/CoreAudio.component/Contents/SharedSupport/SystemSounds/system/Grab.aif",
+    "/System/Library/Sounds/Pop.aiff",
+)
+
+
+def play_capture_sound() -> None:
+    """Best-effort: play the macOS shutter sound so the capture is audible.
+
+    Fire-and-forget (non-blocking) and never raises — a missing sound file or
+    afplay just means no sound, not a failed screenshot. No-op off macOS.
+    """
+    import platform
+
+    if platform.system() != "Darwin":
+        return
+    path = next((p for p in _SHUTTER_SOUNDS if os.path.exists(p)), None)
+    if path is None:
+        return
+    try:
+        subprocess.Popen(["afplay", path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception as exc:  # noqa: BLE001 - sound is optional feedback
+        log.debug("could not play capture sound: %s", exc)
+
+
+def shoot_and_paste(
+    *, capture=front_window_png, copy=copy_image_to_clipboard, paste=None,
+    sound=play_capture_sound,
+) -> bool:
+    """Capture the front window → clipboard → sound → paste into the focused field.
 
     Returns False (and does nothing further) when capture fails. The image is left
     on the clipboard on purpose, so the user can paste it again. We deliberately do
-    NOT restore the previous clipboard — "copy it right away" is the feature.
+    NOT restore the previous clipboard — "copy it right away" is the feature. The
+    shutter sound fires only after a real capture lands on the clipboard.
     """
     if paste is None:
         from .paste import send_paste_shortcut
@@ -112,6 +144,7 @@ def shoot_and_paste(*, capture=front_window_png, copy=copy_image_to_clipboard, p
         return False
     try:
         copy(path)
+        sound()
         paste()
         return True
     finally:
