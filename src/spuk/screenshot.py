@@ -8,7 +8,9 @@ wrappers exercised by the opt-in integration check and the live app.
 from __future__ import annotations
 
 import logging
+import os
 import subprocess
+import tempfile
 
 log = logging.getLogger("spuk.screenshot")
 
@@ -39,3 +41,74 @@ def pick_window(window_infos: list[dict], pid: int) -> int | None:
 def capture_window_to_png(window_id: int, path: str, *, runner=subprocess.run) -> None:
     """Capture exactly ``window_id`` to ``path``: no sound (-x), no shadow (-o)."""
     runner(["screencapture", "-x", "-o", "-l", str(window_id), path], check=True)
+
+
+def front_window_png() -> str | None:
+    """Capture the frontmost app's front window to a temp PNG; return path or None."""
+    try:
+        from AppKit import NSWorkspace
+        from Quartz import (
+            CGWindowListCopyWindowInfo,
+            kCGNullWindowID,
+            kCGWindowListOptionOnScreenOnly,
+        )
+    except Exception as exc:  # noqa: BLE001 - non-macOS / framework missing
+        log.debug("screenshot frameworks unavailable: %s", exc)
+        return None
+
+    app = NSWorkspace.sharedWorkspace().frontmostApplication()
+    if app is None:
+        return None
+    pid = app.processIdentifier()
+    infos = CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenOnly, kCGNullWindowID) or []
+    window_id = pick_window(list(infos), pid)
+    if window_id is None:
+        log.info("No capturable front window for pid %s.", pid)
+        return None
+
+    fd, path = tempfile.mkstemp(suffix=".png", prefix="spuk-shot-")
+    os.close(fd)
+    try:
+        capture_window_to_png(window_id, path)
+    except Exception as exc:  # noqa: BLE001
+        log.error("screencapture failed: %s", exc)
+        return None
+    return path
+
+
+def copy_image_to_clipboard(path: str) -> None:
+    """Write the PNG at ``path`` to the general pasteboard as image data."""
+    from AppKit import NSPasteboard, NSPasteboardTypePNG
+    from Foundation import NSData
+
+    data = NSData.dataWithContentsOfFile_(path)
+    if data is None:
+        raise FileNotFoundError(path)
+    pb = NSPasteboard.generalPasteboard()
+    pb.clearContents()
+    pb.setData_forType_(data, NSPasteboardTypePNG)
+
+
+def shoot_and_paste(*, capture=front_window_png, copy=copy_image_to_clipboard, paste=None) -> bool:
+    """Capture the front window → clipboard → paste it into the focused field.
+
+    Returns False (and does nothing further) when capture fails. The image is left
+    on the clipboard on purpose, so the user can paste it again. We deliberately do
+    NOT restore the previous clipboard — "copy it right away" is the feature.
+    """
+    if paste is None:
+        from .paste import send_paste_shortcut
+
+        paste = send_paste_shortcut
+    path = capture()
+    if not path:
+        return False
+    try:
+        copy(path)
+        paste()
+        return True
+    finally:
+        try:
+            os.remove(path)
+        except OSError:
+            pass

@@ -327,3 +327,12 @@ def _send_paste_shortcut() -> None:
         _get_injector()()
     except Exception as exc:  # noqa: BLE001 - never let a paste failure crash the loop
         log.error("Could not send paste shortcut: %s", exc)
+
+
+def send_paste_shortcut() -> None:
+    """Public: send the configured paste shortcut now (same injector as dictation).
+
+    Used by the screenshot gesture to paste the captured image. Goes through the
+    same main-thread-safe pynput injector, so it's umlaut/main-thread correct.
+    """
+    _send_paste_shortcut()
