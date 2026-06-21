@@ -82,12 +82,14 @@ class AppleSpeechEngine:
         *,
         recognizer: object | None = None,
         audio_engine: object | None = None,
+        request: object | None = None,
     ) -> None:
         self._on_partial = on_partial
         self._on_final = on_final
         self._on_error = on_error
         self._recognizer = recognizer
         self._audio_engine = audio_engine
+        self._request_in = request
         self._task: object | None = None
         self._request: object | None = None
 
@@ -103,7 +105,17 @@ class AppleSpeechEngine:
             if rec is None:
                 log.warning("SFSpeechRecognizer unavailable for en-US locale.")
                 return False
-            rec.setRequiresOnDeviceRecognition_(True)
+            # requiresOnDeviceRecognition is a property of the REQUEST, not the
+            # recognizer — it is set in start(). The recognizer only exposes the
+            # read-only supportsOnDeviceRecognition.
+            try:
+                if not rec.supportsOnDeviceRecognition():
+                    log.warning(
+                        "On-device recognition unavailable for en-US — enable macOS "
+                        "Dictation (System Settings → Keyboard) to install the model."
+                    )
+            except Exception:
+                pass
             self._recognizer = rec
             self._audio_engine = AVAudioEngine.alloc().init()
             return True
@@ -124,14 +136,22 @@ class AppleSpeechEngine:
         recognizer = self._recognizer
         audio_engine = self._audio_engine
 
-        # Build recognition request
-        try:
-            from Speech import SFSpeechAudioBufferRecognitionRequest
-            request = SFSpeechAudioBufferRecognitionRequest.alloc().init()
-            request.setShouldReportPartialResults_(True)
-        except Exception:
-            # In tests, we skip the real framework import
-            request = None
+        # Build + configure the recognition request. requiresOnDeviceRecognition
+        # lives on SFSpeechRecognitionRequest (NOT the recognizer) and keeps all
+        # audio on-device. Injectable via the ``request`` constructor arg for tests.
+        request = self._request_in
+        if request is None:
+            try:
+                from Speech import SFSpeechAudioBufferRecognitionRequest
+                request = SFSpeechAudioBufferRecognitionRequest.alloc().init()
+            except Exception:
+                request = None  # non-Darwin / no framework
+        if request is not None:
+            try:
+                request.setShouldReportPartialResults_(True)
+                request.setRequiresOnDeviceRecognition_(True)
+            except Exception as exc:
+                log.warning("Could not configure recognition request: %s", exc)
 
         self._request = request
 

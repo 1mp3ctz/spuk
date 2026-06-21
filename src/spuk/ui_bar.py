@@ -520,6 +520,17 @@ def run_bar(config: Config, core: SpukCore) -> None:
         app._spuk_main_runner = _MainThreadRunner()  # type: ignore[attr-defined]  # strong ref
         set_main_thread_runner(app._spuk_main_runner.run)  # type: ignore[attr-defined]
 
+        # Speech Recognition stays "not determined" until we explicitly ask. Without
+        # this the on-device recognizer can't start AND Spuk never even appears in
+        # System Settings → Privacy → Speech Recognition. Ask once at launch (the OS
+        # shows the prompt only the first time; it's a no-op once decided).
+        if config.apple_speech.enabled:
+            from .apple_speech import request_speech_authorization
+
+            request_speech_authorization(
+                lambda status: log.info("Speech Recognition authorization: %s", status)
+            )
+
     # One shared signal bus: the core fires these (from the hotkey thread) and
     # both the floating bar and the main window listen on them.
     signals = CoreSignals()

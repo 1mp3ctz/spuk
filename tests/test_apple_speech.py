@@ -33,18 +33,52 @@ def _make_fake_recognizer(partial_text="hello", final_text="hello world"):
             calls["stop"] += 1
 
     class FakeRecognizer:
-        def __init__(self):
-            self._on_device = False
-
-        def setRequiresOnDeviceRecognition_(self, v):
-            self._on_device = v
-
+        # NB: a real SFSpeechRecognizer has NO setRequiresOnDeviceRecognition_ —
+        # that property lives on the request. The fake mirrors that.
         def recognitionTaskWithRequest_resultHandler_(self, request, handler):
             calls["task_started"] = True
             handler_ref[0] = handler
             return FakeTask()
 
     return FakeRecognizer(), handler_ref, calls
+
+
+def _make_fake_request():
+    """Fake SFSpeechAudioBufferRecognitionRequest recording its configuration."""
+    calls = {"partial_results": None, "on_device": None}
+
+    class FakeRequest:
+        def setShouldReportPartialResults_(self, v):
+            calls["partial_results"] = v
+
+        def setRequiresOnDeviceRecognition_(self, v):
+            calls["on_device"] = v
+
+        def appendAudioPCMBuffer_(self, buf):
+            pass
+
+    return FakeRequest(), calls
+
+
+def test_on_device_flag_is_set_on_the_request_not_the_recognizer():
+    """Regression: requiresOnDeviceRecognition is a property of the REQUEST
+    (SFSpeechRecognitionRequest), not SFSpeechRecognizer. Setting it on the
+    recognizer raised AttributeError and the engine never started."""
+    fake_recognizer, _handler, _ = _make_fake_recognizer()
+    fake_audio, _ = _make_fake_audio_engine()
+    fake_request, req_calls = _make_fake_request()
+
+    engine = AppleSpeechEngine(
+        on_partial=lambda t: None,
+        on_final=lambda t: None,
+        on_error=lambda e: None,
+        recognizer=fake_recognizer,
+        audio_engine=fake_audio,
+        request=fake_request,
+    )
+    assert engine.start() is True
+    assert req_calls["partial_results"] is True
+    assert req_calls["on_device"] is True
 
 
 def _make_fake_audio_engine(ok=True):
