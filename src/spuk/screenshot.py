@@ -70,14 +70,21 @@ def front_window_png() -> str | None:
     os.close(fd)
     try:
         capture_window_to_png(window_id, path)
+        return path
     except Exception as exc:  # noqa: BLE001
         log.error("screencapture failed: %s", exc)
+        try:
+            os.remove(path)
+        except OSError:
+            pass
         return None
-    return path
 
 
 def copy_image_to_clipboard(path: str) -> None:
     """Write the PNG at ``path`` to the general pasteboard as image data."""
+    import platform
+    if platform.system() != "Darwin":
+        raise RuntimeError("clipboard image copy is macOS-only")
     from AppKit import NSPasteboard, NSPasteboardTypePNG
     from Foundation import NSData
 
