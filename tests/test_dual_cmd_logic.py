@@ -22,6 +22,8 @@ def test_other_modifier_blocks_the_gesture():
     assert both_cmd_only(CMD_L | CMD_R | CTRL_L) is False
     assert both_cmd_only(CMD_L | CMD_R | ALT_L) is False
     assert both_cmd_only(CMD_L | CMD_R | FN) is False
+    assert both_cmd_only(CMD_L | CMD_R | 0x4) is False      # right shift
+    assert both_cmd_only(CMD_L | CMD_R | 0x2000) is False   # right ctrl
 
 
 def test_caps_lock_is_ignored():

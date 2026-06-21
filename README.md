@@ -41,13 +41,13 @@ text** into whatever app you're in. How you allow that differs by platform:
 
 | Platform | What you grant | Where | Re-do after an update? |
 |----------|----------------|-------|------------------------|
-| 🍎 **macOS** | **Microphone** + **Accessibility** + **Input Monitoring** (three toggles) | System Settings → Privacy & Security | **Yes** — see the note below |
+| 🍎 **macOS** | **Microphone** + **Accessibility** + **Input Monitoring** (three toggles; plus **Screen Recording** for the ⌘+⌘ screenshot) | System Settings → Privacy & Security | **Yes** — see the note below |
 | 🪟 **Windows** | Nothing app-specific. Just make sure the **global** microphone switch is on | Settings → Privacy & security → Microphone | No |
 | 🐧 **Linux** | Add your user to the **`input`** group + install a clipboard tool | one-time terminal command | No |
 
 > 🍎 **macOS re-asks after every update.** Because Spuk isn't signed with a paid
 > Apple certificate, macOS treats each new version as a "different" app and
-> **forgets the three permissions on every update** — you'll re-grant them once
+> **forgets your granted permissions on every update** — you'll re-grant them once
 > after each new version. Windows and Linux do **not** have this; you set them up
 > once and updates keep working. (Details in step 3 below and
 > [Troubleshooting](#-troubleshooting).)
@@ -95,7 +95,7 @@ in each of these:
 > talk) and it will appear so you can switch it on. You may need to quit and reopen
 > Spuk after granting these.
 >
-> 🔁 **After every update you'll re-grant these three** — macOS forgets them when
+> 🔁 **After every update you'll re-grant these** — macOS forgets them when
 > the app changes (because Spuk isn't paid-signed). It's the same quick toggles,
 > just once per new version. This is macOS-only; Windows and Linux keep working.
 
@@ -222,8 +222,9 @@ copying files by hand.
    **progress bar** *(added in v1.0.2)*, then replaces itself and **restarts
    automatically**. It's a biggish download, so give it a moment; you can **Cancel** any time.
 
-> 🍎 **Mac only:** when it restarts, macOS will ask you to re-grant the three
-> permissions (**Microphone**, **Accessibility**, **Input Monitoring**) — it sees the
+> 🍎 **Mac only:** when it restarts, macOS will ask you to re-grant your
+> permissions (**Microphone**, **Accessibility**, **Input Monitoring**, and
+> **Screen Recording** if you use the screenshot feature) — it sees the
 > new version as a "different" app. Same quick toggles, just once per update.
 > **Windows keeps its setup** across updates, no re-granting.
 
@@ -276,7 +277,7 @@ the same way as the first time (`sudo apt install ./spuk_*.deb` / `sudo dnf inst
 
 **No pill / nothing appears on screen.**
 On Mac, make sure you opened it via **right-click → Open** the first time, and that
-you granted the three permissions below. Try holding the hotkey and speaking — the
+you granted the required permissions below. Try holding the hotkey and speaking — the
 pill is small and sits at the bottom-center.
 
 **I hold the keys and talk, but no text appears.**

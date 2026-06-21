@@ -88,7 +88,7 @@ class MacFlagsTap:
             try:
                 self._handle_flags(int(Quartz.CGEventGetFlags(event)))
             except Exception as exc:  # noqa: BLE001
-                log.debug("flags callback error: %s", exc)
+                log.debug("CGEventGetFlags error: %s", exc)
             return event  # listen-only: pass the event through unchanged
 
         self._tap = Quartz.CGEventTapCreate(

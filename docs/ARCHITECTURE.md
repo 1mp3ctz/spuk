@@ -102,7 +102,7 @@ Press both ⌘ keys simultaneously to capture the frontmost window and paste it 
 
 ### `mac_flags_tap` — listen-only Quartz event tap
 
-`MacFlagsTap` (`screenshot.py`) opens a **listen-only** `CGEventTap` on the `flagsChanged` event (modifier state changes). It is passive — it never intercepts or swallows events — which means it requires no Accessibility permission and cannot block other keyboard input. The tap calls `on_dual_cmd` when both ⌘ bits are set and no other modifiers are held.
+`MacFlagsTap` (`mac_flags_tap.py`) opens a **listen-only** `CGEventTap` on the `flagsChanged` event (modifier state changes). It is passive — it never intercepts or swallows events — which means it requires no Accessibility permission and cannot block other keyboard input. The tap calls `on_dual_cmd` when both ⌘ bits are set and no other modifiers are held.
 
 This is the shared foundation that also unblocks Fn-key hotkey support (issue #17): a dedicated `flagsChanged` tap reading the `kCGEventFlagMaskSecondaryFn` bit is the same pattern, macOS-only, and fits cleanly into this seam.
 
