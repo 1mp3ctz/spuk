@@ -37,3 +37,10 @@ enabled                       = false
 i_understand_this_costs_money = false   # second safety latch — both must be true to ever call the API
 provider                      = "claude"
 max_calls_per_day             = 50      # hard cap, fails closed
+
+[screenshot]
+# macOS only. Press BOTH Command keys (left + right, nothing else) to screenshot
+# the window you're in, copy it to the clipboard, and paste it into the focused
+# field. Fully local — nothing is uploaded.
+enabled = true
+gesture = "dual_cmd"   # reserved for future trigger choices

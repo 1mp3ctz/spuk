@@ -77,11 +77,18 @@ class PostProcessConfig:
 
 
 @dataclass(frozen=True)
+class ScreenshotConfig:
+    enabled: bool = True
+    gesture: str = "dual_cmd"
+
+
+@dataclass(frozen=True)
 class Config:
     transcribe: TranscribeConfig
     hotkey: HotkeyConfig
     audio: AudioConfig
     post_process: PostProcessConfig
+    screenshot: ScreenshotConfig
 
 
 def _overlay_user_languages(t: dict) -> None:
@@ -158,6 +165,7 @@ def load_config(path: Path | None = None) -> Config:
         hotkey = HotkeyConfig(**h)
         audio = AudioConfig(**raw["audio"])
         post_process = PostProcessConfig(**raw["post_process"])
+        screenshot = ScreenshotConfig(**raw.get("screenshot", {}))
     except (KeyError, TypeError) as exc:
         raise ValueError(f"Invalid or incomplete config in {cfg_path}: {exc}") from exc
 
@@ -172,4 +180,5 @@ def load_config(path: Path | None = None) -> Config:
             f"must be one of transcribe.languages {transcribe.languages}."
         )
 
-    return Config(transcribe=transcribe, hotkey=hotkey, audio=audio, post_process=post_process)
+    return Config(transcribe=transcribe, hotkey=hotkey, audio=audio,
+                  post_process=post_process, screenshot=screenshot)
