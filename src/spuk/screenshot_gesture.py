@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 import platform
 import threading
+from typing import Callable
 
 from .mac_flags_tap import MacFlagsTap
 from .permissions import request_screen_recording, screen_recording_trusted
@@ -30,13 +31,39 @@ def run_capture_async() -> None:
     threading.Thread(target=work, name="spuk-shoot", daemon=True).start()
 
 
-def start_if_enabled(config) -> MacFlagsTap | None:
-    """Start the dual-⌘ tap when on macOS and enabled. Returns the tap or None."""
+def start_if_enabled(
+    config,
+    on_fn_press: "Callable[[], None] | None" = None,
+    on_fn_release: "Callable[[], None] | None" = None,
+) -> "MacFlagsTap | None":
+    """Start the flags tap when on macOS and at least one gesture is enabled.
+
+    Starts if screenshot is enabled OR Fn callbacks are provided. A single tap
+    handles both gestures so the CGEventTap is registered only once.
+    Returns the tap or None.
+    """
     if platform.system() != "Darwin":
         return None
-    if not getattr(config.screenshot, "enabled", False):
+
+    screenshot_enabled = getattr(config.screenshot, "enabled", False)
+    fn_enabled = on_fn_press is not None or on_fn_release is not None
+
+    if not screenshot_enabled and not fn_enabled:
         return None
-    if screen_recording_trusted() is False:
-        request_screen_recording()
-    log.info("Dual-⌘ screenshot gesture armed (press both Command keys).")
-    return MacFlagsTap(on_dual_cmd=run_capture_async).start()
+
+    if screenshot_enabled:
+        if screen_recording_trusted() is False:
+            request_screen_recording()
+        dual_cmd_cb = run_capture_async
+        log.info("Dual-⌘ screenshot gesture armed (press both Command keys).")
+    else:
+        dual_cmd_cb = lambda: None  # noqa: E731 — tap needed for Fn, screenshot off
+
+    if fn_enabled:
+        log.info("Fn dictation gesture armed.")
+
+    return MacFlagsTap(
+        on_dual_cmd=dual_cmd_cb,
+        on_fn_press=on_fn_press,
+        on_fn_release=on_fn_release,
+    ).start()

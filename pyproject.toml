@@ -1,6 +1,6 @@
 [project]
 name = "spuk"
-version = "1.1.1"
+version = "1.2.0"
 description = "Private, local, free press-to-talk dictation for macOS, Windows, and Linux."
 readme = "README.md"
 license = "MIT"
@@ -25,6 +25,8 @@ dependencies = [
     # names are 'Quartz' and 'AppKit'/'Foundation'.
     "pyobjc-framework-Quartz>=10,<12; sys_platform == 'darwin'",
     "pyobjc-framework-Cocoa>=10,<12; sys_platform == 'darwin'",
+    "pyobjc-framework-Speech>=10,<12; sys_platform == 'darwin'",
+    "pyobjc-framework-AVFoundation>=10,<12; sys_platform == 'darwin'",
 ]
 
 [project.scripts]

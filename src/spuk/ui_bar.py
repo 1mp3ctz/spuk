@@ -12,6 +12,7 @@ through Qt signals (queued automatically across threads).
 
 from __future__ import annotations
 
+import logging
 import threading
 
 from PySide6.QtCore import (
@@ -43,6 +44,8 @@ from .hotkey_format import combo_to_label
 from .languages import display_name
 from .screenshot_gesture import start_if_enabled as _start_screenshot
 
+log = logging.getLogger("spuk.ui_bar")
+
 # Native display names for the three first-class languages; anything else falls
 # back to the English language name from languages.display_name().
 LANGUAGE_NAMES = {"en": "English", "de": "Deutsch", "pl": "Polski"}
@@ -67,6 +70,10 @@ class CoreSignals(QObject):
     ready = Signal()
     combo_captured = Signal(str)   # a Settings hotkey capture finished
     hotkey_changed = Signal()      # bindings changed -> refresh labels
+    live_partial = Signal(str)     # partial Apple speech result (GCD → Qt main)
+    live_final = Signal(str)       # final Apple speech result (GCD → Qt main)
+    live_start = Signal()          # Fn pressed: start Apple engine
+    live_stop = Signal()           # Fn released: stop Apple engine
 
 
 class _MainThreadRunner(QObject):
@@ -120,6 +127,15 @@ class SpukBar(QWidget):
         self._expanded = False
         self._recording = False  # tracks core recording state so a click can stop it
         self._open_window = None  # set by run_bar; clicking the pill opens the window
+
+        # Apple speech engine + live inserter (Fn dictation, macOS only).
+        self._apple_engine = None
+        import platform as _plt
+        if _plt.system() == "Darwin":
+            from .live_insert import LiveInserter
+            self._live_insert = LiveInserter()
+        else:
+            self._live_insert = None
 
         self.setWindowFlags(
             Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
@@ -258,6 +274,11 @@ class SpukBar(QWidget):
         self._sig.languages.connect(lambda _codes: self._rebuild_langs())
         self._sig.ready.connect(lambda: self._status.setText("ready"))
         self._sig.hotkey_changed.connect(self._on_hotkey_changed)
+        # Apple speech live wiring (macOS Fn dictation).
+        self._sig.live_partial.connect(self._on_live_partial)
+        self._sig.live_final.connect(self._on_live_final)
+        self._sig.live_start.connect(self._on_fn_press)
+        self._sig.live_stop.connect(self._on_fn_release)
 
     def _on_recording(self, active: bool) -> None:
         self._recording = active
@@ -279,6 +300,38 @@ class SpukBar(QWidget):
 
     def _on_hotkey_changed(self) -> None:
         self._hint.setText(self._hint_text())
+
+    def _on_live_partial(self, text: str) -> None:
+        if self._live_insert is not None:
+            self._live_insert.update(text)
+
+    def _on_live_final(self, text: str) -> None:
+        if self._live_insert is not None:
+            self._live_insert.commit()
+
+    def _on_fn_press(self) -> None:
+        if not self._cfg.apple_speech.enabled:
+            return
+        if self._live_insert is None:
+            return
+        from .apple_speech import AppleSpeechEngine
+        engine = AppleSpeechEngine(
+            on_partial=self._sig.live_partial.emit,
+            on_final=self._sig.live_final.emit,
+            on_error=lambda e: log.warning("Apple speech error: %s", e),
+        )
+        if engine.start():
+            self._apple_engine = engine
+        else:
+            self._live_insert.cancel()
+
+    def _on_fn_release(self) -> None:
+        eng = self._apple_engine
+        if eng is not None:
+            eng.stop()
+            self._apple_engine = None
+        if self._live_insert is not None:
+            self._live_insert.commit()
 
     def _dictate_released(self) -> None:
         # Transcribe+paste blocks ~1s — keep it off the UI thread.
@@ -386,7 +439,15 @@ def _menubar_icon() -> QIcon:
     return QIcon(pm)
 
 
-def _install_menubar(app, on_open, on_quit, on_permissions=None, on_stop_recording=None) -> "QSystemTrayIcon | None":
+def _install_menubar(
+    app,
+    on_open,
+    on_quit,
+    on_permissions=None,
+    on_stop_recording=None,
+    on_toggle_apple_speech=None,
+    apple_speech_enabled_fn=None,
+) -> "QSystemTrayIcon | None":
     """Add a menu-bar (system-tray) icon to stop a recording, open Settings, the
     macOS Permissions helper, or quit Spuk.
 
@@ -395,8 +456,9 @@ def _install_menubar(app, on_open, on_quit, on_permissions=None, on_stop_recordi
     always-available "Stop recording" item — a hotkey-independent way to shut the
     mic off if a hands-free recording can't be stopped from the keyboard.
     ``on_permissions`` adds a "Permissions…" item (macOS only) so the helper is
-    always reachable. Returns the icon (kept alive by `app`) or None if the
-    platform has no system tray.
+    always reachable. ``on_toggle_apple_speech`` and ``apple_speech_enabled_fn``
+    add an "Apple Dictation (Fn)" checkbox item (macOS only).
+    Returns the icon (kept alive by `app`) or None if the platform has no system tray.
     """
     if not QSystemTrayIcon.isSystemTrayAvailable():
         return None
@@ -410,6 +472,11 @@ def _install_menubar(app, on_open, on_quit, on_permissions=None, on_stop_recordi
         stop_action.triggered.connect(lambda: on_stop_recording())
     open_action = menu.addAction("Settings…")
     open_action.triggered.connect(lambda: on_open())
+    if on_toggle_apple_speech is not None:
+        apple_action = menu.addAction("Apple Dictation (Fn)")
+        apple_action.setCheckable(True)
+        apple_action.setChecked(apple_speech_enabled_fn() if apple_speech_enabled_fn else False)
+        apple_action.triggered.connect(lambda checked: on_toggle_apple_speech(checked))
     if on_permissions is not None:
         perms_action = menu.addAction("Permissions…")
         perms_action.triggered.connect(lambda: on_permissions())
@@ -472,7 +539,23 @@ def run_bar(config: Config, core: SpukCore) -> None:
     # macOS/Windows, evdev on Linux) so it can swap it live when the user
     # changes a hotkey in Settings.
     core.start_input()
-    _screenshot_tap = _start_screenshot(config)
+
+    # Fn dictation callbacks: marshal through Qt signals so engine start/stop
+    # runs on the main thread (same as where pynput paste injection must run).
+    _fn_press_cb = None
+    _fn_release_cb = None
+    if platform.system() == "Darwin" and config.apple_speech.enabled:
+        def _fn_press_cb() -> None:  # noqa: E306
+            signals.live_start.emit()
+
+        def _fn_release_cb() -> None:  # noqa: E306
+            signals.live_stop.emit()
+
+    _screenshot_tap = _start_screenshot(
+        config,
+        on_fn_press=_fn_press_cb,
+        on_fn_release=_fn_release_cb,
+    )
 
     def quit_app() -> None:
         # Quit cleanly: stop the Qt event loop and let the process shut down
@@ -483,6 +566,9 @@ def run_bar(config: Config, core: SpukCore) -> None:
         # the hard exit caused.
         if _screenshot_tap:
             _screenshot_tap.stop()
+        eng = bar._apple_engine
+        if eng is not None:
+            eng.stop()
         app.quit()
 
     window.set_quit(quit_app)
@@ -507,9 +593,26 @@ def run_bar(config: Config, core: SpukCore) -> None:
             app._spuk_perms_dialog = PermissionsDialog(on_quit=quit_app)  # type: ignore[attr-defined]
             app._spuk_perms_dialog.present()  # type: ignore[attr-defined]
 
-    # Menu-bar icon (Stop recording / Settings / Permissions / Quit). Held by the
-    # app so it isn't GC'd.
-    app._spuk_tray = _install_menubar(app, window.present, quit_app, open_permissions, stop_recording)  # type: ignore[attr-defined]
+    # Apple Dictation (Fn) toggle: saves preference; the Fn callbacks above are
+    # already wired — toggling here just persists the intent for next launch.
+    _apple_enabled = [config.apple_speech.enabled]
+
+    def toggle_apple_speech(checked: bool) -> None:
+        from .settings_store import update_user_settings
+        _apple_enabled[0] = checked
+        update_user_settings(apple_speech_enabled=checked)
+
+    # Menu-bar icon (Stop recording / Settings / Apple Dictation / Permissions / Quit).
+    # Held by the app so it isn't GC'd.
+    app._spuk_tray = _install_menubar(  # type: ignore[attr-defined]
+        app,
+        window.present,
+        quit_app,
+        open_permissions,
+        stop_recording,
+        on_toggle_apple_speech=toggle_apple_speech if platform.system() == "Darwin" else None,
+        apple_speech_enabled_fn=lambda: _apple_enabled[0] if platform.system() == "Darwin" else False,
+    )
     app._spuk_window = window  # type: ignore[attr-defined]  # keep a strong ref
 
     # Auto-show the permissions helper ONLY when a grant is actually missing (first

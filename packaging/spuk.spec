@@ -35,7 +35,7 @@ hiddenimports += collect_submodules("pynput")
 # LAZY imports PyInstaller can't see statically — force them in so the frozen app
 # can run the gesture.
 if sys.platform == "darwin":
-    hiddenimports += ["Quartz", "AppKit", "Foundation"]
+    hiddenimports += ["Quartz", "AppKit", "Foundation", "Speech", "AVFoundation"]
 
 # Ship a default, user-editable config beside the app.
 datas += [(os.path.join(ROOT, "config.toml"), ".")]
@@ -93,7 +93,8 @@ app = BUNDLE(
         "LSUIElement": True,  # background/menu-bar app, no Dock icon
         "NSMicrophoneUsageDescription": "Spuk transcribes your speech locally.",
         "NSScreenCaptureUsageDescription": "Spuk captures the window you choose (press both Command keys) so you can paste it. The image stays on your Mac.",
-        "CFBundleShortVersionString": "1.1.1",
-        "CFBundleVersion": "1.1.1",
+        "NSSpeechRecognitionUsageDescription": "Spuk uses on-device speech recognition when you hold the Fn key. Audio never leaves your Mac.",
+        "CFBundleShortVersionString": "1.2.0",
+        "CFBundleVersion": "1.2.0",
     },
 )

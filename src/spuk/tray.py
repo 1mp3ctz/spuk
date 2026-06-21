@@ -62,6 +62,7 @@ def run_tray(config: Config, core: SpukCore) -> None:
     # Mutable containers so toggle callbacks can swap state (mutable-closure pattern).
     _tap = [None]
     _enabled = [config.screenshot.enabled]
+    _apple_enabled = [config.apple_speech.enabled]
 
     def is_screenshot_enabled(item):
         return _enabled[0]
@@ -80,6 +81,14 @@ def run_tray(config: Config, core: SpukCore) -> None:
             _tap[0] = _start_screenshot(cfg_on)
         icon.update_menu()
 
+    def is_apple_speech_enabled(item):
+        return _apple_enabled[0]
+
+    def toggle_apple_speech(icon, item):
+        _apple_enabled[0] = not _apple_enabled[0]
+        update_user_settings(apple_speech_enabled=_apple_enabled[0])
+        icon.update_menu()
+
     def on_quit(icon, item):
         log.info("Quitting Spuk.")
         if _tap[0] is not None:
@@ -88,11 +97,19 @@ def run_tray(config: Config, core: SpukCore) -> None:
         # hotkey listener is a daemon thread, so it doesn't block shutdown.
         icon.stop()
 
+    import platform as _plt
+    apple_menu_items = (
+        [MenuItem("Apple Dictation (Fn)", toggle_apple_speech, checked=is_apple_speech_enabled)]
+        if _plt.system() == "Darwin"
+        else []
+    )
+
     menu = Menu(
         MenuItem(lambda item: f"Spuk — {lang_label(core.language)}", None, enabled=False),
         Menu.SEPARATOR,
         MenuItem("Language", Menu(*language_items)),
         MenuItem("Screenshot on ⌘ + ⌘", toggle_screenshot, checked=is_screenshot_enabled),
+        *apple_menu_items,
         Menu.SEPARATOR,
         MenuItem("Quit", on_quit),
     )

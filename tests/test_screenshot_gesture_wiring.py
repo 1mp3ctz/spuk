@@ -22,7 +22,7 @@ def test_start_if_enabled_starts_tap_when_enabled_on_macos(monkeypatch):
     started = {"v": False}
 
     class FakeTap:
-        def __init__(self, on_dual_cmd):
+        def __init__(self, on_dual_cmd, on_fn_press=None, on_fn_release=None):
             self.cb = on_dual_cmd
 
         def start(self):
