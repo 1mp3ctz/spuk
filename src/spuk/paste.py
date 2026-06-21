@@ -336,3 +336,31 @@ def send_paste_shortcut() -> None:
     same main-thread-safe pynput injector, so it's umlaut/main-thread correct.
     """
     _send_paste_shortcut()
+
+
+# --- live streaming dictation helpers (no clipboard touch) ------------------
+
+_bs_state: dict = {}
+
+
+def live_type(text: str) -> None:
+    """Type ``text`` as keystrokes (live dictation; no clipboard)."""
+    _type_text(text)
+
+
+def live_backspace(count: int) -> None:
+    """Press Backspace ``count`` times to erase provisional live-dictation text."""
+    if count <= 0:
+        return
+
+    def do() -> None:
+        from pynput.keyboard import Controller, Key
+
+        ctrl = _bs_state.get("kb")
+        if ctrl is None:
+            _bs_state["kb"] = ctrl = Controller()
+        for _ in range(count):
+            ctrl.press(Key.backspace)
+            ctrl.release(Key.backspace)
+
+    _run_on_main(do)
