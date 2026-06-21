@@ -30,6 +30,13 @@ for pkg in ("ctranslate2", "faster_whisper", "av", "tokenizers", "pystray", "PIL
 
 hiddenimports += collect_submodules("pynput")
 
+# macOS: the dual-⌘ screenshot uses Quartz (CGEventTap / CGWindowList / screen-
+# capture access), AppKit (NSWorkspace / NSPasteboard) and Foundation (NSData) via
+# LAZY imports PyInstaller can't see statically — force them in so the frozen app
+# can run the gesture.
+if sys.platform == "darwin":
+    hiddenimports += ["Quartz", "AppKit", "Foundation"]
+
 # Ship a default, user-editable config beside the app.
 datas += [(os.path.join(ROOT, "config.toml"), ".")]
 
@@ -86,6 +93,7 @@ app = BUNDLE(
         "LSUIElement": True,  # background/menu-bar app, no Dock icon
         "NSMicrophoneUsageDescription": "Spuk transcribes your speech locally.",
         "NSScreenCaptureUsageDescription": "Spuk captures the window you choose (press both Command keys) so you can paste it. The image stays on your Mac.",
-        "CFBundleShortVersionString": "1.0.8",
+        "CFBundleShortVersionString": "1.1.0",
+        "CFBundleVersion": "1.1.0",
     },
 )

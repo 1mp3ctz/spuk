@@ -132,15 +132,26 @@ class HotkeyListener:
         if self._capturing:
             self._capture_press(key)
             return
-        # Self-heal a dropped key-UP: a modifier can't repeat its key-DOWN without
-        # an intervening release, so seeing one we still hold means macOS dropped
-        # the release and our chord state is stale. Quietly forget the stale hold
-        # (no callbacks) so the press below re-arms a single clean chord edge —
-        # otherwise the chord stays wedged "down" and can never be stopped again.
+        # Self-heal a dropped key-UP. A modifier can't auto-repeat its key-DOWN
+        # without an intervening release, so a DOWN for one we still believe is held
+        # means macOS dropped its release and our state is stale (common on focus
+        # changes / event-tap stalls).
         if key in self._pressed and _is_modifier(key):
-            self._pressed.discard(key)
-            if self._chord_down and not self._satisfied(self._expected):
+            if self._chord_down:
+                # We thought the chord was fully held, but this re-press proves at
+                # least one release was dropped — so the WHOLE chord is suspect, not
+                # just this key (the other expected modifiers may be just as stale).
+                # Tear the chord down and forget the other expected keys so it can
+                # only re-fire once the user genuinely re-presses the full chord —
+                # exactly ONE clean edge. Discarding only the re-pressed key (the
+                # old behaviour) let a stale sibling modifier re-satisfy the chord
+                # and fire a PHANTOM edge on every key-down, which made toggle mode
+                # flip unpredictably and left the mic stuck on with no way to stop.
                 self._chord_down = False
+                self._pressed -= self._expected
+            else:
+                # Chord wasn't held; just drop this one stale hold.
+                self._pressed.discard(key)
         self._pressed.add(key)
         self._fire_taps()
         if self._satisfied(self._expected) and not self._chord_down:
@@ -274,11 +285,21 @@ class HotkeyListener:
             self._press_up(t)
 
     def _press_down(self, t: float) -> None:
-        if self._latched:
-            # Hands-free is running: this press stops it and transcribes.
+        if self._latched or self._recording:
+            # A full chord-press while we're ALREADY recording is always a STOP,
+            # never the start of a second recording. This covers two cases with
+            # one rule: (a) hands-free is latched (chord not held) — press to stop
+            # and transcribe; (b) a desynced "stuck" recording where macOS dropped
+            # the key-UP that should have ended a hold or a double-tap, leaving the
+            # mic on with no clean release — re-pressing the chord must end it.
+            # Without this, a re-press over a stuck recording started a SECOND
+            # recording, so the mic could never be stopped (the v1.0.9 self-heal
+            # un-wedged the chord state but left the recording running).
             self._latched = False
             self._recording = False
             self._ignore_release = True
+            self._pending_double = False
+            self._last_tap_time = float("-inf")
             self._on_stop()
             return
         # Begin capturing immediately (keeps hold-to-talk latency low). Whether
