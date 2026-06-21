@@ -354,13 +354,16 @@ def live_backspace(count: int) -> None:
         return
 
     def do() -> None:
-        from pynput.keyboard import Controller, Key
+        try:
+            from pynput.keyboard import Controller, Key
 
-        ctrl = _bs_state.get("kb")
-        if ctrl is None:
-            _bs_state["kb"] = ctrl = Controller()
-        for _ in range(count):
-            ctrl.press(Key.backspace)
-            ctrl.release(Key.backspace)
+            ctrl = _bs_state.get("kb")
+            if ctrl is None:
+                _bs_state["kb"] = ctrl = Controller()
+            for _ in range(count):
+                ctrl.press(Key.backspace)
+                ctrl.release(Key.backspace)
+        except Exception as exc:  # noqa: BLE001 - never let a backspace crash the slot
+            log.error("Could not send live backspaces: %s", exc)
 
     _run_on_main(do)

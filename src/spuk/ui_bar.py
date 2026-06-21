@@ -128,14 +128,25 @@ class SpukBar(QWidget):
         self._recording = False  # tracks core recording state so a click can stop it
         self._open_window = None  # set by run_bar; clicking the pill opens the window
 
-        # Apple speech engine + live inserter (Fn dictation, macOS only).
-        self._apple_engine = None
+        # Fn live-dictation controller (macOS only). Owns the Apple engine
+        # lifecycle so a hot mic can always be stopped exactly once (see
+        # fn_dictation.FnDictationController).
+        self._fn = None
         import platform as _plt
         if _plt.system() == "Darwin":
+            from .fn_dictation import FnDictationController
             from .live_insert import LiveInserter
-            self._live_insert = LiveInserter()
-        else:
-            self._live_insert = None
+
+            def _make_engine():
+                from .apple_speech import AppleSpeechEngine
+
+                return AppleSpeechEngine(
+                    on_partial=self._sig.live_partial.emit,
+                    on_final=self._sig.live_final.emit,
+                    on_error=lambda e: log.warning("Apple speech error: %s", e),
+                )
+
+            self._fn = FnDictationController(LiveInserter(), _make_engine)
 
         self.setWindowFlags(
             Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
@@ -302,12 +313,12 @@ class SpukBar(QWidget):
         self._hint.setText(self._hint_text())
 
     def _on_live_partial(self, text: str) -> None:
-        if self._live_insert is not None:
-            self._live_insert.update(text)
+        if self._fn is not None:
+            self._fn.on_partial(text)
 
     def _on_live_final(self, text: str) -> None:
-        if self._live_insert is not None:
-            self._live_insert.commit()
+        if self._fn is not None:
+            self._fn.on_final(text)
 
     def _on_fn_press(self) -> None:
         enabled = getattr(self, "_apple_enabled", None)
@@ -316,26 +327,17 @@ class SpukBar(QWidget):
                 return
         elif not self._cfg.apple_speech.enabled:
             return
-        if self._live_insert is None:
-            return
-        from .apple_speech import AppleSpeechEngine
-        engine = AppleSpeechEngine(
-            on_partial=self._sig.live_partial.emit,
-            on_final=self._sig.live_final.emit,
-            on_error=lambda e: log.warning("Apple speech error: %s", e),
-        )
-        if engine.start():
-            self._apple_engine = engine
-        else:
-            self._live_insert.cancel()
+        if self._fn is not None:
+            self._fn.on_press()
 
     def _on_fn_release(self) -> None:
-        eng = self._apple_engine
-        if eng is not None:
-            eng.stop()
-            self._apple_engine = None
-        if self._live_insert is not None:
-            self._live_insert.commit()
+        if self._fn is not None:
+            self._fn.on_release()
+
+    def stop_fn_dictation(self) -> None:
+        """Stop a live Fn-dictation engine if running (menu-bar toggle-off / quit)."""
+        if self._fn is not None:
+            self._fn.stop()
 
     def _dictate_released(self) -> None:
         # Transcribe+paste blocks ~1s — keep it off the UI thread.
@@ -581,9 +583,7 @@ def run_bar(config: Config, core: SpukCore) -> None:
         # the hard exit caused.
         if _screenshot_tap:
             _screenshot_tap.stop()
-        eng = bar._apple_engine
-        if eng is not None:
-            eng.stop()
+        bar.stop_fn_dictation()
         app.quit()
 
     window.set_quit(quit_app)
@@ -612,6 +612,10 @@ def run_bar(config: Config, core: SpukCore) -> None:
         from .settings_store import update_user_settings
         _apple_enabled[0] = checked
         update_user_settings(apple_speech_enabled=checked)
+        if not checked:
+            # Disabling while the mic is live must stop it now, not on the next
+            # Fn press — otherwise the toggle can't shut off a streaming mic.
+            bar.stop_fn_dictation()
 
     # Menu-bar icon (Stop recording / Settings / Apple Dictation / Permissions / Quit).
     # Held by the app so it isn't GC'd.

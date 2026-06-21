@@ -31,7 +31,7 @@ OTHER_MODS = (
     | 0x00000020  # left alt
     | 0x00000040  # right alt
     | 0x00002000  # right ctrl
-    | 0x00800000  # fn / secondary
+    | FN_BIT  # fn / secondary
 )
 
 

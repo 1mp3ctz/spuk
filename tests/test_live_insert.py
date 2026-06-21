@@ -21,12 +21,12 @@ def test_first_update_types_without_backspace():
     assert typed == ["hello"]
 
 
-def test_second_update_erases_previous():
+def test_growing_update_keeps_common_prefix():
     ins, typed, backed = make_inserter()
     ins.update("hell")
     ins.update("hello world")
-    assert backed == [4]          # erased "hell" (4 chars)
-    assert typed == ["hell", "hello world"]
+    assert backed == []                  # "hell" is a prefix — nothing erased
+    assert typed == ["hell", "o world"]  # only the new suffix is typed
 
 
 def test_update_empty_text_erases_provisional():
@@ -34,7 +34,7 @@ def test_update_empty_text_erases_provisional():
     ins.update("abc")
     ins.update("")
     assert backed == [3]
-    assert typed == ["abc", ""]
+    assert typed == ["abc"]   # empty suffix → no extra type call
 
 
 def test_commit_clears_provisional():
@@ -61,9 +61,26 @@ def test_cancel_when_nothing_provisional_is_noop():
     assert typed == []
 
 
-def test_unicode_len_counts_code_points():
-    """len("über") = 4 code points → 4 backspaces."""
+def test_backspace_counts_code_points_not_bytes():
+    """A fully-diverging update backspaces one per code point ("über" = 4)."""
     ins, typed, backed = make_inserter()
-    ins.update("über")
-    ins.update("überall")
+    ins.update("über")     # 4 code points (ü is multi-byte in UTF-8 but 1 code point)
+    ins.update("x")        # shares no prefix → erase all 4, type "x"
     assert backed == [4]
+    assert typed == ["über", "x"]
+
+
+def test_revised_partial_backspaces_only_divergent_tail():
+    ins, typed, backed = make_inserter()
+    ins.update("their")
+    ins.update("there")          # common "the" (3); erase "ir" (2); type "re"
+    assert backed == [2]
+    assert typed == ["their", "re"]
+
+
+def test_identical_partial_is_noop():
+    ins, typed, backed = make_inserter()
+    ins.update("hello")
+    ins.update("hello")          # nothing changed → no keystrokes
+    assert backed == []
+    assert typed == ["hello"]

@@ -111,17 +111,6 @@ class AppleSpeechEngine:
             log.warning("Could not build Apple speech objects: %s", exc)
             return False
 
-    def _build_request(self) -> object | None:
-        """Create and configure the audio buffer recognition request."""
-        try:
-            from Speech import SFSpeechAudioBufferRecognitionRequest
-            req = SFSpeechAudioBufferRecognitionRequest.alloc().init()
-            req.setShouldReportPartialResults_(True)
-            return req
-        except Exception as exc:
-            log.warning("Could not create recognition request: %s", exc)
-            return None
-
     def start(self) -> bool:
         """Start live recognition. Returns True on success."""
         if platform.system() != "Darwin" and self._recognizer is None:

@@ -39,10 +39,25 @@ class LiveInserter:
             live_backspace(count)
 
     def update(self, text: str) -> None:
-        """Replace provisional text with ``text``. Erases previous via Backspace."""
-        if self._provisional:
-            self._backspace(len(self._provisional))
-        self._type(text)
+        """Replace provisional text with ``text``, touching only what changed.
+
+        Streaming partials usually just grow ("hi" → "hi there"), so we keep the
+        common prefix and only backspace/retype the divergent tail. Fewer
+        keystrokes means less flicker and far less fighting with the focused
+        field's autocorrect than erasing and retyping the whole line each time.
+        """
+        prev = self._provisional
+        common = 0
+        for a, b in zip(prev, text):
+            if a != b:
+                break
+            common += 1
+        erase = len(prev) - common
+        if erase > 0:
+            self._backspace(erase)
+        suffix = text[common:]
+        if suffix:
+            self._type(suffix)
         self._provisional = text
 
     def commit(self) -> None:

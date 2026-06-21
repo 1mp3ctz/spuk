@@ -10,8 +10,8 @@ def test_live_inserter_update_calls_type_fn():
     ins = LiveInserter(type_fn=typed.append, backspace_fn=backed.append)
     ins.update("hello")
     ins.update("hello world")
-    assert typed == ["hello", "hello world"]
-    assert backed == [5]  # erased "hello"
+    assert typed == ["hello", " world"]  # only the new suffix is typed
+    assert backed == []                  # "hello" is a common prefix — nothing erased
 
 
 def test_apple_speech_engine_partial_and_final_via_fake():

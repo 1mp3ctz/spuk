@@ -42,14 +42,14 @@ def test_speech_recognition_authorized_uses_status():
     import spuk.apple_speech as asp
 
     original = asp.speech_auth_status
+    try:
+        asp.speech_auth_status = lambda: "authorized"
+        assert permissions.speech_recognition_authorized() is True
 
-    asp.speech_auth_status = lambda: "authorized"
-    assert permissions.speech_recognition_authorized() is True
+        asp.speech_auth_status = lambda: "denied"
+        assert permissions.speech_recognition_authorized() is False
 
-    asp.speech_auth_status = lambda: "denied"
-    assert permissions.speech_recognition_authorized() is False
-
-    asp.speech_auth_status = lambda: "not_determined"
-    assert permissions.speech_recognition_authorized() is None
-
-    asp.speech_auth_status = original
+        asp.speech_auth_status = lambda: "not_determined"
+        assert permissions.speech_recognition_authorized() is None
+    finally:
+        asp.speech_auth_status = original
