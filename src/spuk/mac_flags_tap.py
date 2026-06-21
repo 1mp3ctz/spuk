@@ -23,6 +23,7 @@ log = logging.getLogger("spuk.mac_flags_tap")
 
 CMD_L = 0x00000008
 CMD_R = 0x00000010
+FN_BIT = 0x00800000  # kCGEventFlagMaskSecondaryFn
 OTHER_MODS = (
     0x00000001  # left ctrl
     | 0x00000002  # left shift
@@ -48,6 +49,16 @@ def dual_cmd_edge(active: bool, armed: bool) -> tuple[bool, bool]:
     return False, True
 
 
+def fn_edge(flags: int, fn_down: bool) -> tuple[bool, bool, bool]:
+    """Pure Fn press/release edge detector. Returns (press, release, new_fn_down)."""
+    now_down = bool(flags & FN_BIT)
+    if now_down and not fn_down:
+        return True, False, True
+    if not now_down and fn_down:
+        return False, True, False
+    return False, False, now_down
+
+
 class MacFlagsTap:
     """Listen-only flagsChanged tap that fires ``on_dual_cmd`` on both-⌘.
 
@@ -57,15 +68,24 @@ class MacFlagsTap:
     is testable without a real tap.
     """
 
-    def __init__(self, on_dual_cmd: Callable[[], None]) -> None:
+    def __init__(
+        self,
+        on_dual_cmd: Callable[[], None],
+        on_fn_press: Callable[[], None] | None = None,
+        on_fn_release: Callable[[], None] | None = None,
+    ) -> None:
         self._cb = on_dual_cmd
+        self._on_fn_press = on_fn_press
+        self._on_fn_release = on_fn_release
         self._armed = False
+        self._fn_down = False
         self._tap = None
         self._runloop_source = None
         self._runloop = None
         self._thread: threading.Thread | None = None
 
     def _handle_flags(self, flags: int) -> None:
+        # dual-⌘ (unchanged)
         active = both_cmd_only(flags)
         fire, self._armed = dual_cmd_edge(active, self._armed)
         if fire:
@@ -73,6 +93,19 @@ class MacFlagsTap:
                 self._cb()
             except Exception as exc:  # noqa: BLE001 - never kill the tap thread
                 log.error("dual-⌘ handler failed: %s", exc)
+
+        # Fn press / release
+        press, release, self._fn_down = fn_edge(flags, self._fn_down)
+        if press and self._on_fn_press is not None:
+            try:
+                self._on_fn_press()
+            except Exception as exc:  # noqa: BLE001
+                log.error("fn-press handler failed: %s", exc)
+        if release and self._on_fn_release is not None:
+            try:
+                self._on_fn_release()
+            except Exception as exc:  # noqa: BLE001
+                log.error("fn-release handler failed: %s", exc)
 
     def start(self) -> "MacFlagsTap":
         if platform.system() != "Darwin":
