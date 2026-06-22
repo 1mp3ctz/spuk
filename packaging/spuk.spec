@@ -94,7 +94,7 @@ app = BUNDLE(
         "NSMicrophoneUsageDescription": "Spuk transcribes your speech locally.",
         "NSScreenCaptureUsageDescription": "Spuk captures the window you choose (press both Command keys) so you can paste it. The image stays on your Mac.",
         "NSSpeechRecognitionUsageDescription": "Spuk uses on-device speech recognition when you hold the Fn key. Audio never leaves your Mac.",
-        "CFBundleShortVersionString": "1.2.1",
-        "CFBundleVersion": "1.2.1",
+        "CFBundleShortVersionString": "1.2.2",
+        "CFBundleVersion": "1.2.2",
     },
 )
