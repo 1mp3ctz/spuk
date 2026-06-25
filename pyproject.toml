@@ -13,7 +13,7 @@ dependencies = [
     "pynput>=1.7,<2",              # global hotkey + synthetic paste (cross-platform)
     "pyperclip>=1.9,<2",           # clipboard get/set
     "pystray>=0.19,<0.20",         # cross-platform system-tray icon (macOS + Windows)
-    "pillow>=10,<12",              # generate the tray icon at runtime
+    "pillow>=10,<13",              # generate the tray icon at runtime
     "pyside6>=6.6,<7",
     # Linux only: read /dev/input for the global hotkey and inject paste via
     # /dev/uinput (works under X11 AND Wayland, unlike pynput). The marker keeps
