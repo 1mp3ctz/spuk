@@ -17,10 +17,10 @@ jobs:
     runs-on: macos-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v7
 
       - name: Create Python 3.11 environment
         # Runner disks are normal APFS (not exFAT), so no UV_LINK_MODE=copy needed,
@@ -117,7 +117,7 @@ jobs:
           echo "Built DMG:"; du -sh Spuk-macos.dmg
 
       - name: Upload macOS artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Spuk-macos
           path: |
@@ -131,10 +131,10 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v7
 
       - name: Create Python 3.11 environment
         run: uv venv --python 3.11 .venv
@@ -164,7 +164,7 @@ jobs:
         run: Compress-Archive -Path dist\Spuk -DestinationPath Spuk-windows.zip -Force
 
       - name: Upload Windows artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Spuk-windows
           path: Spuk-windows.zip
@@ -176,10 +176,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v7
 
       - name: Install build tooling (fpm + rpm + compiler for evdev)
         # fpm (Ruby) builds the .deb/.rpm; rpm provides rpmbuild so the .rpm is
@@ -211,7 +211,7 @@ jobs:
           echo 'Linux artifacts:'; du -sh dist/*.deb dist/*.rpm dist/*.tar.gz
 
       - name: Upload Linux artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Spuk-linux
           path: |
@@ -230,25 +230,25 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Download macOS artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: Spuk-macos
           path: dist-macos
 
       - name: Download Windows artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: Spuk-windows
           path: dist-windows
 
       - name: Download Linux artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: Spuk-linux
           path: dist-linux
 
       - name: Create / update the GitHub Release and attach binaries
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           fail_on_unmatched_files: true
           generate_release_notes: true
