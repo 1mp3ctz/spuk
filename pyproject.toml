@@ -26,7 +26,7 @@ dependencies = [
     "pyobjc-framework-Quartz>=10,<12; sys_platform == 'darwin'",
     "pyobjc-framework-Cocoa>=10,<13; sys_platform == 'darwin'",
     "pyobjc-framework-Speech>=10,<12; sys_platform == 'darwin'",
-    "pyobjc-framework-AVFoundation>=10,<12; sys_platform == 'darwin'",
+    "pyobjc-framework-AVFoundation>=10,<13; sys_platform == 'darwin'",
 ]
 
 [project.scripts]
