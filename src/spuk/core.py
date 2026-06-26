@@ -221,6 +221,13 @@ class SpukCore:
         listener explicitly for capture, separate from the started stop-handle.
         """
         from .input_backend import make_input_backend
+        from .mac_tap_heal import install_pynput_tap_healing
+
+        # macOS disables event taps (timeout / heavy synthetic input / sleep-wake)
+        # and pynput never re-enables its own — so the hotkey would die until a
+        # restart. Patch pynput to re-arm its tap BEFORE the listener is created.
+        # No-op off macOS or if pynput's internals differ.
+        install_pynput_tap_healing()
 
         self._listener = self.make_listener()
         self._backend = make_input_backend(self._listener).start()
