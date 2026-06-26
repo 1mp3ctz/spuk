@@ -68,11 +68,21 @@ class Recorder:
 
     def stop(self) -> np.ndarray:
         """Stop recording and return the captured mono audio (may be empty)."""
-        if self._stream is None:
+        stream = self._stream
+        if stream is None:
             return np.zeros(0, dtype=np.float32)
-        self._stream.stop()
-        self._stream.close()
+        # Clear the handle BEFORE tearing the stream down. PortAudio can raise from
+        # stop()/close() after a sleep/wake or a mic-device change; if that left
+        # self._stream set, start()'s `if self._stream is not None: return` guard
+        # would silently no-op every later recording — hotkey, Fn, and the
+        # Hold-to-talk button all route through here — until the app restarted.
+        # Resetting first makes a failed teardown fully recoverable.
         self._stream = None
+        try:
+            stream.stop()
+            stream.close()
+        except Exception as exc:  # noqa: BLE001 - best-effort teardown; never wedge
+            log.warning("Audio stream teardown failed (ignored, recorder reset): %s", exc)
 
         if not self._frames:
             return np.zeros(0, dtype=np.float32)
