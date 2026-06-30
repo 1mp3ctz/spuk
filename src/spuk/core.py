@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+import threading
 import time
 from typing import Callable
 
@@ -100,6 +101,15 @@ class SpukCore:
         # started stop-handle. Owned here so rebind can swap them live.
         self._listener = None
         self._backend = None
+
+        # Transcription is slow (1-3s). On the GUI hotkey path on_stop fires on the
+        # macOS event-tap run-loop thread, so blocking it there trips
+        # kCGEventTapDisabledByTimeout and global input dies until restart — so we
+        # hand the work to a worker (start_input turns this on; headless stays
+        # inline). The lock serialises workers so the shared Whisper model is never
+        # entered twice at once and pastes keep their spoken order.
+        self._async_stop = False
+        self._stop_lock = threading.Lock()
 
     # --- language state ---------------------------------------------------
 
@@ -228,6 +238,11 @@ class SpukCore:
         # restart. Patch pynput to re-arm its tap BEFORE the listener is created.
         # No-op off macOS or if pynput's internals differ.
         install_pynput_tap_healing()
+
+        # GUI path: hotkey callbacks fire on the macOS event-tap thread, so the
+        # stop must offload transcription to a worker (see _on_stop) — never block
+        # the tap. The best heal can't help while the callback itself is stuck.
+        self._async_stop = True
 
         self._listener = self.make_listener()
         self._backend = make_input_backend(self._listener).start()
@@ -387,6 +402,8 @@ class SpukCore:
             self.on_recording_change(False)
 
     def _on_stop(self) -> None:
+        # Stop the mic and report it RIGHT NOW (both cheap) so the pill un-sticks
+        # the instant the key is released — before the slow transcription.
         audio = self._recorder.stop()
         if self.on_recording_change:
             self.on_recording_change(False)
@@ -395,21 +412,42 @@ class SpukCore:
             log.info("… too short (%.2fs) — ignoring.", duration)
             return
 
-        log.info("… transcribing %.2fs of audio (%s)", duration, self._language)
-        t0 = time.perf_counter()
-        try:
-            text = self._transcriber.transcribe(audio, self._cfg.audio.samplerate, self._language)
-        except Exception as exc:
-            log.error("Transcription failed: %s", exc)
-            return
-        elapsed = time.perf_counter() - t0
+        # Transcription blocks 1-3s. The global hotkey calls this from the pynput
+        # listener thread, which on macOS IS the CGEventTap run-loop — stalling it
+        # makes macOS disable the tap (kCGEventTapDisabledByTimeout): the hotkey
+        # dies until restart and the key-UP dropped during the stall wedges the mic
+        # on. So on the GUI path hand off to a worker. Capture the language now so a
+        # mid-flight switch can't change this clip's.
+        if self._async_stop:
+            threading.Thread(
+                target=self._transcribe_and_paste,
+                args=(audio, duration, self._language),
+                name="spuk-transcribe",
+                daemon=True,
+            ).start()
+        else:
+            self._transcribe_and_paste(audio, duration, self._language)
 
-        if not text:
-            log.info("Empty transcript — nothing to paste.")
-            return
+    def _transcribe_and_paste(self, audio, duration: float, language: str) -> None:
+        """Transcribe the captured clip and paste it. Serialised by ``_stop_lock``
+        so overlapping stops never enter the shared CTranslate2 model at once and
+        pastes stay in spoken order."""
+        with self._stop_lock:
+            log.info("… transcribing %.2fs of audio (%s)", duration, language)
+            t0 = time.perf_counter()
+            try:
+                text = self._transcriber.transcribe(audio, self._cfg.audio.samplerate, language)
+            except Exception as exc:
+                log.error("Transcription failed: %s", exc)
+                return
+            elapsed = time.perf_counter() - t0
 
-        text = self._post.process(text)
-        log.info("→ (%.2fs) %s", elapsed, text)
-        paste_text(text)
-        if self.on_transcript:
-            self.on_transcript(text)
+            if not text:
+                log.info("Empty transcript — nothing to paste.")
+                return
+
+            text = self._post.process(text)
+            log.info("→ (%.2fs) %s", elapsed, text)
+            paste_text(text)
+            if self.on_transcript:
+                self.on_transcript(text)
